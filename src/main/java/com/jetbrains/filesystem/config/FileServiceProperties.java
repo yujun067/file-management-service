@@ -8,9 +8,12 @@ import org.springframework.stereotype.Component;
 public class FileServiceProperties {
     private String rootFolder;
 
-    // getter and setter
     public String getRootFolder() {
         return rootFolder;
+    }
+
+    public void setRootFolder(String rootFolder) {
+        this.rootFolder = rootFolder;
     }
 }
 
