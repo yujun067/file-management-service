@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: filesystem
+
+fileservice:
+  rootFolder: /tmp/my-root
+
+server:
+  port: 8081
+
+
