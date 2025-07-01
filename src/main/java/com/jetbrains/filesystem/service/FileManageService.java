@@ -21,7 +21,7 @@ public class FileManageService {
 
     public GetFileInfoResponse getFileInfo(String relativePath) throws IOException {
         Path root = Paths.get(properties.getRootFolder()).toAbsolutePath().normalize();
-        Path target = Paths.get(properties.getRootFolder(), relativePath);
+        Path target = root.resolve(relativePath).normalize();
 
         File file = target.toFile();
         if (!file.exists()) {

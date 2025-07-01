@@ -44,9 +44,15 @@ public class FileManageServiceTest {
     void testListDirectoryChildren() throws Exception {
         String testDir = "folder02";
         Path dirPath = Paths.get(fileServiceProperties.getRootFolder(),testDir);
-        Files.createDirectories(dirPath);
-        Files.writeString(dirPath.resolve("file02.txt"), "Hello World");
-        Files.createDirectory(dirPath.resolve("subfolder02"));
+        if (!Files.exists(dirPath)) {
+            Files.createDirectories(dirPath);
+        }
+        if (!Files.exists(dirPath.resolve("file02.txt"))) {
+            Files.writeString(dirPath.resolve("file02.txt"), "Hello World");
+        }
+        if (!Files.exists(dirPath.resolve("subfolder02"))) {
+            Files.createDirectory(dirPath.resolve("subfolder02"));
+        }
 
         List<FileInfo> fileInfoList = fileManageService.listDirectoryChildren(testDir);
 
@@ -63,6 +69,8 @@ public class FileManageServiceTest {
         }
         assertTrue(hasFile);
         assertTrue(hasSubfolder);
+
+
     }
 
 }
