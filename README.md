@@ -277,3 +277,63 @@ JSON Resonse Body
 }
 ```
 
+### Function 7: readFileSegment
+JSON Request Body
+
+file text is "Hello World!"
+the data field in response is base64 encoded
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "readFileSegment",
+  "params": {
+    "path": "folder07/file07.txt",
+    "offset": 0,
+    "length": 100
+  },
+  "id": 7
+}
+```
+
+JSON Resonse Body
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "data": "SGVsbG8gV29ybGQhCg=="
+  },
+  "id": 7
+}
+```
+
+### Function 8: appendDataToFile
+JSON Request Body
+
+the data field in request is base64 encoded
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "appendDataToFile",
+  "params": {
+    "path": "folder08/file08.txt",
+    "data": "MTIz"  
+  },
+  "id": 8
+}
+```
+
+JSON Resonse Body
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "path": "folder08/file08.txt",
+    "appendLength": 3
+  },
+  "id": 8
+}
+```

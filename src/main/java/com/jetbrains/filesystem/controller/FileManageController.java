@@ -63,7 +63,19 @@ public class FileManageController {
                 String targetPath = (String) params.get("targetPath");
                 CopyEntryResponse result = fileService.copyEntry(sourcePath, targetPath);
                 response = new JsonRpcResponse(result, request.getId());
-            } else {
+            } else if("readFileSegment".equals(request.getMethod())) {
+                String path = (String) params.get("path");
+                Number offset = (Number) params.get("offset");
+                Number length = (Number) params.get("length");
+                ReadFileSegmentResponse result = fileService.readFile(path, offset.longValue(), length.intValue());
+                response = new JsonRpcResponse(result, request.getId());
+            } else if("appendDataToFile".equals(request.getMethod())) {
+                String path = (String) params.get("path");
+                String data = (String) params.get("data");
+                AppendDataToFileResponse result = fileService.appendDataToFile(path, data);
+                response = new JsonRpcResponse(result, request.getId());
+            }
+            else {
                 return buildErrorResponse(request.getId(), -32601, "Method not found: " + request.getMethod());
             }
         } catch(FileNotFoundException e) {

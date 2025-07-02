@@ -7,10 +7,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Base64;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -163,6 +168,72 @@ public class FileManageServiceTest {
         Files.deleteIfExists(sourcePath.getParent());
         Files.deleteIfExists(targetPath);
         Files.deleteIfExists(targetPath.getParent());
+    }
+
+    @Test
+    void testReadFileSegment() throws Exception {
+        String testFile = "folder07/file07.txt";
+        Path filePath = Paths.get(fileServiceProperties.getRootFolder(), testFile);
+        Files.createDirectories(filePath.getParent());
+        Files.writeString(filePath, "Hello World");
+
+        ReadFileSegmentResponse response = fileManageService.readFile(testFile, 0, 5);
+        //System.out.println(response.getData().length());
+        String decoded = new String(Base64.getDecoder().decode(response.getData()), StandardCharsets.UTF_8);
+        assertEquals("Hello", decoded);
+        Files.deleteIfExists(filePath);
+        Files.deleteIfExists(filePath.getParent());
+    }
+
+    @Test
+    void testAppendData() throws Exception {
+        String testFile = "folder08/file08.txt";
+        Path filePath = Paths.get(fileServiceProperties.getRootFolder(), testFile);
+        Files.createDirectories(filePath.getParent());
+        Files.writeString(filePath, "Hello World");
+
+        fileManageService.appendDataToFile(testFile, "MTIz");
+        String content = Files.readString(filePath);
+        assertEquals("Hello World123", content);
+        Files.deleteIfExists(filePath);
+        Files.deleteIfExists(filePath.getParent());
+    }
+
+    @Test
+    void testAppendDataConcurrently() throws Exception {
+        String testFile = "folder08/file08.txt";
+        Path filePath = Paths.get(fileServiceProperties.getRootFolder(), testFile);
+        Files.createDirectories(filePath.getParent());
+        Files.writeString(filePath, "");
+
+        ExecutorService executor = Executors.newFixedThreadPool(10);
+        int taskNum = 100;
+        CountDownLatch latch = new CountDownLatch(taskNum);
+        for(int i=0;i<taskNum;i++) {
+            int count = i;
+            executor.submit(()->{
+               try {
+                   String originData = "task"+count;
+                   String encodedData = Base64.getEncoder().encodeToString(originData.getBytes(StandardCharsets.UTF_8));
+                   fileManageService.appendDataToFile(testFile, encodedData);
+               } catch (Exception e) {
+                   e.printStackTrace();
+               } finally {
+                   latch.countDown();
+               }
+            });
+        }
+
+        latch.await();
+        executor.shutdown();
+        String content = Files.readString(filePath);
+        //System.out.println(content);
+        for (int i = 0; i < taskNum; i++) {
+            assertTrue(content.contains("task"+i));
+        }
+
+        Files.deleteIfExists(filePath);
+        Files.deleteIfExists(filePath.getParent());
     }
 
 }

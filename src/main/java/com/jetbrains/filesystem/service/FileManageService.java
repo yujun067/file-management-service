@@ -5,13 +5,15 @@ import com.jetbrains.filesystem.dto.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 @Service
 public class FileManageService {
@@ -202,6 +204,68 @@ public class FileManageService {
         if(Files.exists(target)){
            throw new IllegalArgumentException("target already found:"+target.toString());
         }
+    }
+
+    public ReadFileSegmentResponse readFile(String relativePath, long offset, int length) throws IOException {
+        Path root = Paths.get(properties.getRootFolder()).toAbsolutePath().normalize();
+        Path source = root.resolve(relativePath).normalize();
+
+        File sourceFile = source.toFile();
+        if(!sourceFile.exists() || !sourceFile.isFile()){
+            throw new FileNotFoundException("File not found:"+relativePath);
+        }
+
+        if(length<=0) {
+            throw new IllegalArgumentException("length must be positive");
+        }
+        if(offset < 0 || offset > sourceFile.length()){
+            throw new IllegalArgumentException("offset must be in range [0,"+sourceFile.length()+")");
+        }
+
+        byte[] buffer = new byte[length];
+        int bytesRead = 0;
+
+        try(RandomAccessFile raf = new RandomAccessFile(sourceFile, "r")){
+            raf.seek(offset);
+            bytesRead = raf.read(buffer,0, length);
+        }
+
+        if(bytesRead == -1){
+            bytesRead = 0;
+        }
+
+        String base64Data = Base64.getEncoder().encodeToString(Arrays.copyOf(buffer,bytesRead));
+
+        ReadFileSegmentResponse response = new ReadFileSegmentResponse(base64Data);
+        return response;
+    }
+
+    private final ConcurrentHashMap<String, ReentrantLock> fileLocks = new ConcurrentHashMap<>();
+    public AppendDataToFileResponse appendDataToFile(String relativePath, String encodedData) throws IOException {
+        Path root = Paths.get(properties.getRootFolder()).toAbsolutePath().normalize();
+        Path source = root.resolve(relativePath).normalize();
+
+        File sourceFile = source.toFile();
+        if(!sourceFile.exists()){
+            throw new FileNotFoundException("File not found:"+relativePath);
+        }
+        if(!sourceFile.isFile()){
+            throw new IllegalArgumentException("Can't append to a directory:"+relativePath);
+        }
+
+        ReentrantLock lock = fileLocks.computeIfAbsent(source.toString(), k -> new ReentrantLock());
+        int appendLength = 0;
+        lock.lock();
+        try(FileOutputStream fos = new FileOutputStream(sourceFile, true)) {
+            byte[] originalData = Base64.getDecoder().decode(encodedData);
+            fos.write(originalData);
+            appendLength = originalData.length;
+        } finally {
+            lock.unlock();
+        }
+
+        AppendDataToFileResponse response = new AppendDataToFileResponse(relativePath, appendLength);
+        return response;
     }
 
 }
