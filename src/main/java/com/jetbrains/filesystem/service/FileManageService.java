@@ -13,7 +13,11 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
+
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 
 @Service
 public class FileManageService {
@@ -240,7 +244,15 @@ public class FileManageService {
         return response;
     }
 
-    private final ConcurrentHashMap<String, ReentrantLock> fileLocks = new ConcurrentHashMap<>();
+
+    private final Cache<String, ReentrantLock> fileLocks = Caffeine.newBuilder()
+            .expireAfterAccess(10, TimeUnit.MINUTES)  // auto clean unused lock
+            .build();
+
+    private ReentrantLock getLockForFile(String path) {
+        return fileLocks.get(path, k -> new ReentrantLock());
+    }
+
     public AppendDataToFileResponse appendDataToFile(String relativePath, String encodedData) throws IOException {
         Path root = Paths.get(properties.getRootFolder()).toAbsolutePath().normalize();
         Path source = root.resolve(relativePath).normalize();
@@ -253,7 +265,7 @@ public class FileManageService {
             throw new IllegalArgumentException("Can't append to a directory:"+relativePath);
         }
 
-        ReentrantLock lock = fileLocks.computeIfAbsent(source.toString(), k -> new ReentrantLock());
+        ReentrantLock lock = getLockForFile(source.toString());
         int appendLength = 0;
         lock.lock();
         try(FileOutputStream fos = new FileOutputStream(sourceFile, true)) {
