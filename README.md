@@ -73,7 +73,7 @@ JSON Request Body
   "jsonrpc": "2.0",
   "method": "getFileInfo",
   "params": {
-    "path": "myfolder/myfile.txt"
+    "path": "myfolder/file01.txt"
   },
   "id": 1
 }
@@ -86,7 +86,7 @@ JSON Resonse Body
   "jsonrpc": "2.0",
   "result": {
     "name": "myfile.txt",
-    "path": "myfolder/myfile.txt",
+    "path": "myfolder/file01.txt",
     "size": 13
   },
   "id": 1
@@ -114,17 +114,166 @@ JSON Resonse Body
 {
   "jsonrpc": "2.0",
   "result": [{
-    "path": "myfolder/myfile2.txt",
-    "name": "myfile2.txt",
+    "path": "myfolder/file02.txt",
+    "name": "file2.txt",
     "size": 10,
     "directory": false
   }, {
-    "path": "myfolder/fold03",
-    "name": "fold03",
+    "path": "myfolder/fold02",
+    "name": "fold02",
     "size": 64,
     "directory": true
   }],
   "id": 2
+}
+```
+
+### Function 3: createEntry
+
+case 1: JSON Request Body 
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "createEntry",
+  "params": {
+    "path": "myfolder/file03.txt",
+    "type": "file"
+  },
+  "id": 3
+}
+
+```
+
+case 1: JSON Resonse Body
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "name": "file03.txt",
+    "path": "myfolder/file03.txt",
+    "size": 0,
+    "directory": false
+  },
+  "id": 3
+}
+
+```
+
+
+case 2: JSON Request Body
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "createEntry",
+  "params": {
+    "path": "myfolder/folder03",
+    "type": "folder"
+  },
+  "id": 3
+}
+
+```
+
+
+case 2: JSON Resonse Body
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "name": "folder03",
+    "path": "myfolder/folder03",
+    "size": 64,
+    "directory": true
+  },
+  "id": 3
+}
+```
+
+### Function 4: deleteEntry
+
+JSON Request Body
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "deleteEntry",
+  "params": {
+    "path": "folder03"
+  },
+  "id": 4
+}
+```
+
+JSON Resonse Body
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "path": "folder03"
+  },
+  "id": 4
+}
+```
+
+### Function 5: moveEntry
+JSON Request Body
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "moveEntry",
+  "params": {
+    "sourcePath": "folder01/file1.txt",
+    "targetPath": "folder02/file5.txt"
+  },
+  "id": 5
+}
+```
+
+JSON Resonse Body
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "sourcePath": "folder01/file1.txt",
+    "targetPath": "folder02/file5.txt"
+  },
+  "id": 5
+}
+```
+
+### Function 6: copyEntry
+JSON Request Body
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "copyEntry",
+  "params": {
+    "sourcePath": "folder01/file1.txt",
+    "targetPath": "folder02/file5.txt"
+  },
+  "id": 6
+}
+```
+
+JSON Resonse Body
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "sourcePath": "folder01/file1.txt",
+    "targetPath": "folder02/file5.txt"
+  },
+  "id": 6
 }
 ```
 

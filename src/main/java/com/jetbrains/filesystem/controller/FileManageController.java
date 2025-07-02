@@ -1,9 +1,6 @@
 package com.jetbrains.filesystem.controller;
 
-import com.jetbrains.filesystem.dto.FileInfo;
-import com.jetbrains.filesystem.dto.GetFileInfoResponse;
-import com.jetbrains.filesystem.dto.JsonRpcRequest;
-import com.jetbrains.filesystem.dto.JsonRpcResponse;
+import com.jetbrains.filesystem.dto.*;
 import com.jetbrains.filesystem.service.FileManageService;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -13,6 +10,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.HashMap;
@@ -45,8 +43,27 @@ public class FileManageController {
                 String path = (String) params.get("path");
                 List<FileInfo> result = fileService.listDirectoryChildren(path);
                 response = new JsonRpcResponse(result, request.getId());
-            }
-            else {
+            } else if("createEntry".equals(request.getMethod())) {
+                String path = (String) params.get("path");
+                //2 types: file, folder
+                String type = (String) params.get("type");
+                CreateEntryResponse result = fileService.createEntry(path, type);
+                response = new JsonRpcResponse(result, request.getId());
+            } else if("deleteEntry".equals(request.getMethod())) {
+                String path = (String) params.get("path");
+                DeleteEntryResponse result = fileService.deleteEntry(path);
+                response = new JsonRpcResponse(result, request.getId());
+            } else if("moveEntry".equals(request.getMethod())) {
+                String sourcePath = (String) params.get("sourcePath");
+                String targetPath = (String) params.get("targetPath");
+                MoveEntryResponse result = fileService.moveEntry(sourcePath, targetPath);
+                response = new JsonRpcResponse(result, request.getId());
+            } else if("copyEntry".equals(request.getMethod())) {
+                String sourcePath = (String) params.get("sourcePath");
+                String targetPath = (String) params.get("targetPath");
+                CopyEntryResponse result = fileService.copyEntry(sourcePath, targetPath);
+                response = new JsonRpcResponse(result, request.getId());
+            } else {
                 return buildErrorResponse(request.getId(), -32601, "Method not found: " + request.getMethod());
             }
         } catch(FileNotFoundException e) {
@@ -61,6 +78,7 @@ public class FileManageController {
 
         return response;
     }
+
 
     private JsonRpcResponse buildErrorResponse(Object id, int code, String message) {
         logger.warn(message);
