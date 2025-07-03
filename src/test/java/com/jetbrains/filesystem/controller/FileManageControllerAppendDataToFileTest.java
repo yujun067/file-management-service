@@ -8,9 +8,10 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.SpyBean;
+import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.boot.test.context.TestConfiguration;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -40,8 +41,20 @@ public class FileManageControllerAppendDataToFileTest {
     @Autowired
     private FileServiceProperties properties;
 
-    @SpyBean
+    @Autowired
     private FileManageService fileService;
+
+    @TestConfiguration
+    static class SpyConfig {
+
+        @Autowired
+        private FileServiceProperties properties;
+
+        @Bean
+        public FileManageService fileManageService() {
+            return spy(new FileManageService(properties));  // ✅ 显式注入 spy 实例
+        }
+    }
 
     private Path root;
     private final String endpoint = "/filemanage";
