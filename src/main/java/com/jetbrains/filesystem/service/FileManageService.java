@@ -1,7 +1,10 @@
 package com.jetbrains.filesystem.service;
 
+import com.jetbrains.filesystem.FilesystemApplication;
 import com.jetbrains.filesystem.config.FileServiceProperties;
 import com.jetbrains.filesystem.dto.*;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -18,20 +21,33 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import org.springframework.util.StringUtils;
 
 @Service
 public class FileManageService {
-    @Autowired
+    private static final Logger logger = LogManager.getLogger(FilesystemApplication.class);
+
     private FileServiceProperties properties;
 
+    public FileManageService(FileServiceProperties properties) {
+        this.properties = properties;
+    }
+
     public GetFileInfoResponse getFileInfo(String relativePath) throws IOException {
+        if(relativePath == null || relativePath.trim().isEmpty()) {
+            throw new IllegalArgumentException("Invalid path");
+        }
         Path root = Paths.get(properties.getRootFolder()).toAbsolutePath().normalize();
         Path target = root.resolve(relativePath).normalize();
 
+        if (!target.startsWith(root)) {
+            throw new IllegalArgumentException("Invalid path: Outside root folder");
+        }
         File file = target.toFile();
         if (!file.exists()) {
             throw new FileNotFoundException("File not found:"+file.getAbsolutePath());
         }
+
 
         GetFileInfoResponse response = new GetFileInfoResponse();
         response.setName(file.getName());
@@ -41,13 +57,20 @@ public class FileManageService {
     }
 
     public List<FileInfo> listDirectoryChildren(String relativePath) throws IOException {
+        if(relativePath == null || relativePath.trim().isEmpty()) {
+            throw new IllegalArgumentException("Invalid path");
+        }
         Path root = Paths.get(properties.getRootFolder()).toAbsolutePath().normalize();
         Path targetDir = root.resolve(relativePath).normalize();
 
+        if (!targetDir.startsWith(root)) {
+            throw new IllegalArgumentException("Invalid path: Outside root folder");
+        }
         File dir = targetDir.toFile();
         if (!dir.exists() || !dir.isDirectory()) {
             throw new IllegalArgumentException("Path is not a directory:"+ relativePath);
         }
+
 
         File[] files = dir.listFiles();
         if (files == null) {
@@ -71,22 +94,22 @@ public class FileManageService {
         Path root = Paths.get(properties.getRootFolder()).toAbsolutePath().normalize();
         Path target = root.resolve(relativePath).normalize();
 
+        if (!target.startsWith(root)) {
+            throw new IllegalArgumentException("Invalid path: Outside root folder");
+        }
         File targetFile = target.toFile();
         if(targetFile.exists()){
             throw new IllegalArgumentException("File or folder already exists:"+ targetFile.getAbsolutePath());
         }
 
-        boolean success = false;
         try {
             if ("file".equals(type)) {
                 Files.createDirectories(target.getParent());
                 Files.createFile(target);
-                success = true;
             } else if("folder".equals(type)) {
                 Files.createDirectories(target);
-                success = true;
             } else {
-                throw new IllegalArgumentException("Invalid type:"+type);
+                throw new IllegalArgumentException("type must be 'file' or 'folder'");
             }
         } catch (IOException e) {
             throw new IOException("Failed to create path: " + e.getMessage());
@@ -100,40 +123,40 @@ public class FileManageService {
         Path root = Paths.get(properties.getRootFolder()).toAbsolutePath().normalize();
         Path target = root.resolve(relativePath).normalize();
 
-        if(!Files.exists(target)){
-            throw new IllegalArgumentException("File not found:"+relativePath);
+        if (!target.startsWith(root)) {
+            throw new IllegalArgumentException("Invalid path: Outside root folder");
         }
-
-        boolean[] success = {true};
+        if(!Files.exists(target)){
+            throw new FileNotFoundException("File not found:"+relativePath);
+        }
 
         try {
             Files.walkFileTree(target, new SimpleFileVisitor<Path>() {
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                    try {
-                        Files.delete(file);
-                    } catch (IOException e) {
-                        success[0] = false;
-                    }
+                    deletePath(file);
+                    logger.debug("delete file:{}", file.toString());
                     return FileVisitResult.CONTINUE;
                 }
 
                 @Override
                 public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-                    try {
-                        Files.delete(dir);
-                    } catch (IOException e) {
-                        success[0] = false;
-                    }
+                    deletePath(dir);
+                    logger.debug("delete dir:{}", dir.toString());
                     return FileVisitResult.CONTINUE;
                 }
             });
         } catch (IOException e) {
-            success[0] = false;
+            throw new IOException("Failed to delete: " + e.getMessage(), e);
         }
 
-        DeleteEntryResponse response = new DeleteEntryResponse(success[0],relativePath);
+        DeleteEntryResponse response = new DeleteEntryResponse(relativePath);
         return response;
+    }
+
+    //Encapsulate as testable methods
+    public void deletePath(Path path) throws IOException {
+        Files.delete(path);
     }
 
     public MoveEntryResponse moveEntry(String sourcePath, String targetPath) throws IOException {
@@ -141,18 +164,18 @@ public class FileManageService {
         Path source = root.resolve(sourcePath).normalize();
         Path target = root.resolve(targetPath).normalize();
 
-        validatePath(source, target);
+        validatePath(source, target, root);
 
         //prevent self-contain
         if (target.startsWith(source)) {
-            throw new IllegalArgumentException("Cannot move a directory into one of its own subdirectories");
+            throw new IllegalArgumentException("own subdirectories");
         }
 
+        //ensure the target's parent folder exists
+        Files.createDirectories(target.getParent());
+
         try {
-            //ensure the target's parent folder exists
-            Files.createDirectories(target.getParent());
-            //execute the movement no matter if they're in the same directory
-            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+            movePath(source, target);
         } catch (IOException e) {
             throw new IOException("Failed to move file:" + sourcePath + " to target:" + targetPath);
         }
@@ -160,30 +183,46 @@ public class FileManageService {
         MoveEntryResponse response = new MoveEntryResponse(sourcePath, targetPath);
         return response;
     }
+    //Encapsulate as testable methods
+    public void movePath(Path source, Path target) throws IOException {
+        Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+    }
+
 
     public CopyEntryResponse copyEntry(String sourcePath, String targetPath) throws IOException {
         Path root = Paths.get(properties.getRootFolder()).toAbsolutePath().normalize();
         Path source = root.resolve(sourcePath).normalize();
         Path target = root.resolve(targetPath).normalize();
 
-        validatePath(source, target);
-
         //prevent self-contain
         if (target.startsWith(source)) {
-            throw new IllegalArgumentException("Cannot copy a directory into one of its own subdirectories");
+            throw new IllegalArgumentException("own subdirectories");
         }
+
+        validatePath(source, target, root);
 
         //ensure the target's parent folder exists
         Files.createDirectories(target.getParent());
 
+        try {
+            copyPath(source, target);
+        } catch (IOException e) {
+            throw new IOException("Failed to copy file:" + sourcePath + " to target:" + targetPath);
+        }
+
+        CopyEntryResponse response = new CopyEntryResponse(sourcePath, targetPath);
+        return response;
+    }
+
+    public void copyPath(Path source, Path target) throws IOException{
         if(Files.isDirectory(source)) {
             Files.walkFileTree(source, new SimpleFileVisitor<Path>() {
-               @Override
-               public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                @Override
+                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
                     Path targetDir = target.resolve(source.relativize(dir));
                     Files.createDirectories(targetDir);
                     return FileVisitResult.CONTINUE;
-               }
+                }
 
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
@@ -195,36 +234,38 @@ public class FileManageService {
         } else {
             Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
         }
-
-
-        CopyEntryResponse response = new CopyEntryResponse(sourcePath, targetPath);
-        return response;
     }
 
-    private void validatePath(Path source, Path target) {
+    private void validatePath(Path source, Path target, Path root ) throws IOException {
+        if (!source.startsWith(root)||!target.startsWith(root)) {
+            throw new IllegalArgumentException("Invalid path: Outside root folder");
+        }
         if(!Files.exists(source)){
-            throw new IllegalArgumentException("source not found:"+source.toString());
+            throw new FileNotFoundException("source not found:"+source.toString());
         }
         if(Files.exists(target)){
-           throw new IllegalArgumentException("target already found:"+target.toString());
+           throw new IllegalArgumentException("target already exists:"+target.toString());
         }
     }
 
     public ReadFileSegmentResponse readFile(String relativePath, long offset, int length) throws IOException {
         Path root = Paths.get(properties.getRootFolder()).toAbsolutePath().normalize();
         Path source = root.resolve(relativePath).normalize();
-
-        File sourceFile = source.toFile();
-        if(!sourceFile.exists() || !sourceFile.isFile()){
-            throw new FileNotFoundException("File not found:"+relativePath);
+        if (!source.startsWith(root)) {
+            throw new IllegalArgumentException("Invalid path: Outside root folder");
         }
 
+        File sourceFile = source.toFile();
         if(length<=0) {
             throw new IllegalArgumentException("length must be positive");
         }
         if(offset < 0 || offset > sourceFile.length()){
             throw new IllegalArgumentException("offset must be in range [0,"+sourceFile.length()+")");
         }
+        if(!sourceFile.exists() || !sourceFile.isFile()){
+            throw new FileNotFoundException("File not found:"+relativePath);
+        }
+
 
         byte[] buffer = new byte[length];
         int bytesRead = 0;
@@ -239,7 +280,6 @@ public class FileManageService {
         }
 
         String base64Data = Base64.getEncoder().encodeToString(Arrays.copyOf(buffer,bytesRead));
-
         ReadFileSegmentResponse response = new ReadFileSegmentResponse(base64Data);
         return response;
     }
@@ -257,6 +297,9 @@ public class FileManageService {
         Path root = Paths.get(properties.getRootFolder()).toAbsolutePath().normalize();
         Path source = root.resolve(relativePath).normalize();
 
+        if (!source.startsWith(root)) {
+            throw new IllegalArgumentException("Invalid path: Outside root folder");
+        }
         File sourceFile = source.toFile();
         if(!sourceFile.exists()){
             throw new FileNotFoundException("File not found:"+relativePath);
@@ -265,6 +308,12 @@ public class FileManageService {
             throw new IllegalArgumentException("Can't append to a directory:"+relativePath);
         }
 
+        int appendLength = appendFileContent(source, sourceFile, encodedData);
+        AppendDataToFileResponse response = new AppendDataToFileResponse(relativePath, appendLength);
+        return response;
+    }
+
+    public int appendFileContent(Path source, File sourceFile, String encodedData) throws  IOException {
         ReentrantLock lock = getLockForFile(source.toString());
         int appendLength = 0;
         lock.lock();
@@ -272,12 +321,14 @@ public class FileManageService {
             byte[] originalData = Base64.getDecoder().decode(encodedData);
             fos.write(originalData);
             appendLength = originalData.length;
-        } finally {
+        } catch(IllegalArgumentException exception) {
+            throw new IllegalArgumentException("failed to append file content");
+        }
+        finally {
             lock.unlock();
         }
 
-        AppendDataToFileResponse response = new AppendDataToFileResponse(relativePath, appendLength);
-        return response;
+        return appendLength;
     }
 
 }

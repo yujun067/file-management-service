@@ -1,20 +1,10 @@
 package com.jetbrains.filesystem.dto;
 
 public class DeleteEntryResponse {
-    private boolean success;
     private String path;
 
-    public DeleteEntryResponse(boolean success, String path) {
-        this.success = success;
+    public DeleteEntryResponse(String path) {
         this.path = path;
-    }
-
-    public boolean isSuccess() {
-        return success;
-    }
-
-    public void setSuccess(boolean success) {
-        this.success = success;
     }
 
     public String getPath() {
@@ -28,9 +18,6 @@ public class DeleteEntryResponse {
 
     @Override
     public String toString() {
-        return "DeleteEntryResponse{" +
-                "success=" + success +
-                ", path='" + path + '\'' +
-                '}';
+        return "DeleteEntryResponse{path='" + path + '\'' + '}';
     }
 }

@@ -5,6 +5,15 @@ public class GetFileInfoResponse {
     private String path;
     private long size;
 
+    public GetFileInfoResponse(String name, String path, long size) {
+        this.name = name;
+        this.path = path;
+        this.size = size;
+    }
+
+    public GetFileInfoResponse() {
+    }
+
     public String getName() {
         return name;
     }

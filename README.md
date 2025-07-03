@@ -59,7 +59,7 @@ The service will expose operations such as file info retrieval, directory listin
 
 ---
 ## Current progress:
-✅ Phase 2 ongoing
+✅ Phase 4 ongoing
 
 ## JSON-RPC Request Introduction
 
@@ -214,7 +214,6 @@ JSON Resonse Body
 {
   "jsonrpc": "2.0",
   "result": {
-    "success": true,
     "path": "folder03"
   },
   "id": 4
@@ -337,3 +336,8 @@ JSON Resonse Body
   "id": 8
 }
 ```
+
+# Test Structure
+
+- `FileServiceTest`: normal use cases (happy path)
+- `FileService*ExceptionTest`: edge cases & error handling

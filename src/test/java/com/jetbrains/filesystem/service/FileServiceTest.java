@@ -1,12 +1,14 @@
-package com.jetbrains.filesystem;
+package com.jetbrains.filesystem.service;
 
 import com.jetbrains.filesystem.config.FileServiceProperties;
 import com.jetbrains.filesystem.dto.*;
-import com.jetbrains.filesystem.service.FileManageService;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,27 +18,59 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
-public class FileManageServiceTest {
+public class FileServiceTest {
     @Autowired
     private FileManageService fileManageService;
     @Autowired
     private FileServiceProperties fileServiceProperties;
 
+    private Path root;
+
+    @BeforeEach
+    void setup() {
+        root = Paths.get(fileServiceProperties.getRootFolder()).toAbsolutePath().normalize();
+    }
+
+    @AfterEach
+    void tearDown() throws IOException {
+        Path testDir = root.resolve("test-folder");
+        if (Files.exists(testDir)) {
+            deleteRecursively(testDir);
+        }
+
+        Path testDir2 = root.resolve("test-folder2");
+        if (Files.exists(testDir2)) {
+            deleteRecursively(testDir2);
+        }
+    }
+
+    private void deleteRecursively(Path path) throws IOException {
+        if (!Files.exists(path)) return;
+        if (Files.isDirectory(path)) {
+            try (Stream<Path> paths = Files.list(path)) {
+                for (Path child : paths.toList()) {
+                    deleteRecursively(child);
+                }
+            }
+        }
+        Files.deleteIfExists(path);
+    }
+
     @Test
     void testGetFileInfo() throws Exception {
-        String testFilePath = "fold01/file01.txt";
-        Path path = Paths.get(fileServiceProperties.getRootFolder(),testFilePath);
+        String testFilePath = "test-folder/file01.txt";
+        Path path = root.resolve(testFilePath);
+
         Files.createDirectories(path.getParent());
-        Files.deleteIfExists(path);
         Files.createFile(path);
         Files.writeString(path, "Hello World");
 
         GetFileInfoResponse response = fileManageService.getFileInfo(testFilePath);
-        //System.out.println(response.toString());
 
         assertEquals("file01.txt", response.getName());
         assertEquals(testFilePath, response.getPath());
@@ -45,17 +79,11 @@ public class FileManageServiceTest {
 
     @Test
     void testListDirectoryChildren() throws Exception {
-        String testDir = "folder02";
+        String testDir = "test-folder";
         Path dirPath = Paths.get(fileServiceProperties.getRootFolder(),testDir);
-        if (!Files.exists(dirPath)) {
-            Files.createDirectories(dirPath);
-        }
-        if (!Files.exists(dirPath.resolve("file02.txt"))) {
-            Files.writeString(dirPath.resolve("file02.txt"), "Hello World");
-        }
-        if (!Files.exists(dirPath.resolve("subfolder02"))) {
-            Files.createDirectory(dirPath.resolve("subfolder02"));
-        }
+        Files.createDirectories(dirPath);
+        Files.writeString(dirPath.resolve("file02.txt"), "Hello World");
+        Files.createDirectory(dirPath.resolve("subfolder02"));
 
         List<FileInfo> fileInfoList = fileManageService.listDirectoryChildren(testDir);
 
@@ -77,7 +105,7 @@ public class FileManageServiceTest {
 
     @Test
     void testCreateFolderRecursively() throws Exception {
-        String testFolder = "folder03/subfolder";
+        String testFolder = "test-folder/subfolder";
         Path dirPath = Paths.get(fileServiceProperties.getRootFolder(),testFolder);
 
         CreateEntryResponse response = fileManageService.createEntry(testFolder,"folder");
@@ -87,51 +115,40 @@ public class FileManageServiceTest {
         assertTrue(response.isDirectory());
         Path newPath = Paths.get(fileServiceProperties.getRootFolder(),testFolder);
         assertTrue(Files.exists(newPath));
-
-        Files.deleteIfExists(dirPath);
-        Files.deleteIfExists(dirPath.getParent());
     }
 
     @Test
     void testCreateFileRecursively() throws Exception {
-        String testFile = "folder03/file03.txt";
-        Path dirPath = Paths.get(fileServiceProperties.getRootFolder(),testFile);
+        String testFile = "test-folder/file03.txt";
 
         CreateEntryResponse response = fileManageService.createEntry(testFile,"file");
-        System.out.println(response.toString());
+        //System.out.println(response.toString());
         assertEquals("file03.txt", response.getName());
         assertEquals(testFile, response.getPath());
         assertFalse(response.isDirectory());
         Path newPath = Paths.get(fileServiceProperties.getRootFolder(),testFile);
         assertTrue(Files.exists(newPath));
-
-        Files.deleteIfExists(dirPath);
-        Files.deleteIfExists(dirPath.getParent());
     }
 
     @Test
     void testDeleteFileRecursively() throws Exception {
         //add a file and a sub folder, to test recursive deletion.
-        String testFolder = "folder04/file04.txt";
+        String testFolder = "test-folder/file04.txt";
         Path dirPath = Paths.get(fileServiceProperties.getRootFolder(),testFolder);
         Files.createDirectories(dirPath.getParent());
         Files.writeString(dirPath, "Hello World");
         Path subFolderPath = dirPath.getParent().resolve("subfolder04").normalize();
         Files.createDirectories(subFolderPath);
 
-        DeleteEntryResponse response = fileManageService.deleteEntry("folder04");
-        System.out.println(response.toString());
-        assertTrue(response.isSuccess());
+        DeleteEntryResponse response = fileManageService.deleteEntry("test-folder");
+        //System.out.println(response.toString());
         assertFalse(Files.exists(dirPath.getParent()));
-
-        Files.deleteIfExists(subFolderPath);
-        Files.deleteIfExists(dirPath);
     }
 
     @Test
     void testMoveFile() throws Exception {
-        String source = "folder05/file05.txt";
-        String target = "folder06/file06.txt";
+        String source = "test-folder/file05.txt";
+        String target = "test-folder2/file06.txt";
         Path sourcePath = Paths.get(fileServiceProperties.getRootFolder(),source);
         Path targetPath = Paths.get(fileServiceProperties.getRootFolder(),target);
         Files.createDirectories(sourcePath.getParent());
@@ -142,17 +159,13 @@ public class FileManageServiceTest {
         assertEquals(target,response.getTargetPath());
         assertFalse(Files.exists(sourcePath));
         assertTrue(Files.exists(targetPath));
-
-        Files.deleteIfExists(sourcePath.getParent());
-        Files.deleteIfExists(targetPath);
-        Files.deleteIfExists(targetPath.getParent());
     }
 
 
     @Test
     void testCopyFile() throws Exception {
-        String source = "folder05/file05.txt";
-        String target = "folder06/file06.txt";
+        String source = "test-folder/file05.txt";
+        String target = "test-folder2/file06.txt";
         Path sourcePath = Paths.get(fileServiceProperties.getRootFolder(),source);
         Path targetPath = Paths.get(fileServiceProperties.getRootFolder(),target);
         Files.createDirectories(sourcePath.getParent());
@@ -163,16 +176,11 @@ public class FileManageServiceTest {
         assertEquals(target,response.getTargetPath());
         assertTrue(Files.exists(sourcePath));
         assertTrue(Files.exists(targetPath));
-
-        Files.deleteIfExists(sourcePath);
-        Files.deleteIfExists(sourcePath.getParent());
-        Files.deleteIfExists(targetPath);
-        Files.deleteIfExists(targetPath.getParent());
     }
 
     @Test
     void testReadFileSegment() throws Exception {
-        String testFile = "folder07/file07.txt";
+        String testFile = "test-folder/file07.txt";
         Path filePath = Paths.get(fileServiceProperties.getRootFolder(), testFile);
         Files.createDirectories(filePath.getParent());
         Files.writeString(filePath, "Hello World");
@@ -181,27 +189,24 @@ public class FileManageServiceTest {
         //System.out.println(response.getData().length());
         String decoded = new String(Base64.getDecoder().decode(response.getData()), StandardCharsets.UTF_8);
         assertEquals("Hello", decoded);
-        Files.deleteIfExists(filePath);
-        Files.deleteIfExists(filePath.getParent());
     }
 
     @Test
     void testAppendData() throws Exception {
-        String testFile = "folder08/file08.txt";
+        String testFile = "test-folder/file08.txt";
         Path filePath = Paths.get(fileServiceProperties.getRootFolder(), testFile);
         Files.createDirectories(filePath.getParent());
         Files.writeString(filePath, "Hello World");
 
+        //append base64 encoded "123"
         fileManageService.appendDataToFile(testFile, "MTIz");
         String content = Files.readString(filePath);
         assertEquals("Hello World123", content);
-        Files.deleteIfExists(filePath);
-        Files.deleteIfExists(filePath.getParent());
     }
 
     @Test
     void testAppendDataConcurrently() throws Exception {
-        String testFile = "folder08/file08.txt";
+        String testFile = "test-folder/file08.txt";
         Path filePath = Paths.get(fileServiceProperties.getRootFolder(), testFile);
         Files.createDirectories(filePath.getParent());
         Files.writeString(filePath, "");
@@ -231,9 +236,6 @@ public class FileManageServiceTest {
         for (int i = 0; i < taskNum; i++) {
             assertTrue(content.contains("task"+i));
         }
-
-        Files.deleteIfExists(filePath);
-        Files.deleteIfExists(filePath.getParent());
     }
 
 }
