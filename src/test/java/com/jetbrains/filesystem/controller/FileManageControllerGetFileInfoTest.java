@@ -66,6 +66,16 @@ public class FileManageControllerGetFileInfoTest {
         Files.deleteIfExists(path);
     }
 
+    private String toJsonRpc(String path, String id) throws Exception {
+        Map<String, Object> params = new HashMap<>();
+        params.put("path", path);
+        JsonRpcRequest request = new JsonRpcRequest();
+        request.setMethod("getFileInfo");
+        request.setId(id);
+        request.setParams(params);
+        return objectMapper.writeValueAsString(request);
+    }
+
     @Test
     public void testGetFileInfo_Success() throws Exception {
         String testFilePath = "test-folder/file01.txt";
@@ -74,17 +84,9 @@ public class FileManageControllerGetFileInfoTest {
         Files.createFile(path);
         Files.writeString(path, "Hello World");
 
-        JsonRpcRequest request = new JsonRpcRequest();
-        request.setMethod("getFileInfo");
-        request.setId("case-0");
-        Map<String, Object> params = new HashMap<>();
-        params.put("path", testFilePath);
-        request.setParams(params);
-
-
         mockMvc.perform(post(endpoint)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(toJsonRpc(testFilePath, "case-0")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.name").value("file01.txt"))
                 .andExpect(jsonPath("$.result.path").value(testFilePath))
@@ -96,16 +98,9 @@ public class FileManageControllerGetFileInfoTest {
 
     @Test
     public void testGetFileInfo_FileNotFound_ShouldReturnError() throws Exception {
-        JsonRpcRequest request = new JsonRpcRequest();
-        request.setMethod("getFileInfo");
-        request.setId("case-1");
-        Map<String, Object> params = new HashMap<>();
-        params.put("path", "nonexistent-file.txt");
-        request.setParams(params);
-
         mockMvc.perform(post(endpoint)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(toJsonRpc("nonexistent-file.txt", "case-1")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error.code").value(-32000))
                 .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("File not found")))
@@ -114,16 +109,9 @@ public class FileManageControllerGetFileInfoTest {
 
     @Test
     public void testGetFileInfo_InvalidPath_ShouldReturnError() throws Exception {
-        JsonRpcRequest request = new JsonRpcRequest();
-        request.setMethod("getFileInfo");
-        request.setId("case-2");
-        Map<String, Object> params = new HashMap<>();
-        params.put("path", "../malicious.txt");
-        request.setParams(params);
-
         mockMvc.perform(post(endpoint)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(toJsonRpc("../malicious.txt", "case-2")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error.code").value(-32602))
                 .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("Outside root folder")))
@@ -132,16 +120,9 @@ public class FileManageControllerGetFileInfoTest {
 
     @Test
     public void testGetFileInfo_NullPath_ShouldReturnError() throws Exception {
-        JsonRpcRequest request = new JsonRpcRequest();
-        request.setMethod("getFileInfo");
-        request.setId("case-3");
-        Map<String, Object> params = new HashMap<>();
-        params.put("path", null);
-        request.setParams(params);
-
         mockMvc.perform(post(endpoint)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(toJsonRpc(null, "case-3")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error.code").value(-32602))
                 .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("Invalid path")))
@@ -150,16 +131,9 @@ public class FileManageControllerGetFileInfoTest {
 
     @Test
     public void testGetFileInfo_EmptyPath_ShouldReturnError() throws Exception {
-        JsonRpcRequest request = new JsonRpcRequest();
-        request.setMethod("getFileInfo");
-        request.setId("case-4");
-        Map<String, Object> params = new HashMap<>();
-        params.put("path", "");
-        request.setParams(params);
-
         mockMvc.perform(post(endpoint)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(toJsonRpc("", "case-4")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error.code").value(-32602))
                 .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("Invalid path")))

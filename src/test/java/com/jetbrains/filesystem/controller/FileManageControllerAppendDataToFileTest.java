@@ -1,6 +1,7 @@
 package com.jetbrains.filesystem.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jetbrains.filesystem.TestSpyConfig;
 import com.jetbrains.filesystem.config.FileServiceProperties;
 import com.jetbrains.filesystem.dto.JsonRpcRequest;
 import com.jetbrains.filesystem.service.FileManageService;
@@ -9,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -29,6 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
+@Import(TestSpyConfig.class)
 @AutoConfigureMockMvc
 public class FileManageControllerAppendDataToFileTest {
 
@@ -44,18 +47,6 @@ public class FileManageControllerAppendDataToFileTest {
     @Autowired
     private FileManageService fileService;
 
-    @TestConfiguration
-    static class SpyConfig {
-
-        @Autowired
-        private FileServiceProperties properties;
-
-        @Bean
-        public FileManageService fileManageService() {
-            return spy(new FileManageService(properties));  // ✅ 显式注入 spy 实例
-        }
-    }
-
     private Path root;
     private final String endpoint = "/filemanage";
 
@@ -66,6 +57,7 @@ public class FileManageControllerAppendDataToFileTest {
 
     @AfterEach
     void tearDown() throws IOException {
+        reset(fileService);  // clear configurations like throws
         Path testDir = root.resolve("test-folder");
         if (Files.exists(testDir)) {
             deleteRecursively(testDir);
