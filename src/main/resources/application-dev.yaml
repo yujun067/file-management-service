@@ -1,8 +1,6 @@
 spring:
   application:
     name: filesystem
-  profiles:
-    active: dev
 
 fileservice:
   rootFolder: /tmp/my-root
