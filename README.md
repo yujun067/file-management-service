@@ -240,7 +240,7 @@ Request:
 - Unit tests are in `src/test/java/com/jetbrains/filesystem/`
 - Run all tests:
   ```sh
-  ./mvnw test
+  mvn clean test
   ```
 
 ---
