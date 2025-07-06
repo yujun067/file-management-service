@@ -124,7 +124,7 @@ For complete details about the JSON-RPC API, including endpoints, request and re
 
 ---
 
-## Request Structure
+### Request Structure
 
 ```json
 {
@@ -137,7 +137,7 @@ For complete details about the JSON-RPC API, including endpoints, request and re
 
 ---
 
-## Response Structure
+### Response Structure
 
 **Success:**
 ```json
@@ -162,51 +162,51 @@ For complete details about the JSON-RPC API, including endpoints, request and re
 
 ---
 
-## Methods
+### Methods
 
-### 1. `getFileInfo`
+#### 1. `getFileInfo`
 - **Description:** Get file or directory information.
 - **Params:** `{ "path": "<relative-path>" }`
 - **Returns:** `{ "name": "...", "path": "...", "size": <bytes> }`
 
-### 2. `listDirectoryChildren`
+#### 2. `listDirectoryChildren`
 - **Description:** List children of a directory.
 - **Params:** `{ "path": "<relative-path>" }`
 - **Returns:** `[{ "name": "...", "path": "...", "size": <bytes>, "directory": <bool> }, ...]`
 
-### 3. `createEntry`
+#### 3. `createEntry`
 - **Description:** Create a file or folder.
 - **Params:** `{ "path": "<relative-path>", "type": "file" | "folder" }`
 - **Returns:** `{ "name": "...", "path": "...", "size": <bytes>, "directory": <bool> }`
 
-### 4. `deleteEntry`
+#### 4. `deleteEntry`
 - **Description:** Delete a file or folder.
 - **Params:** `{ "path": "<relative-path>" }`
 - **Returns:** `{ "path": "..." }`
 
-### 5. `moveEntry`
+#### 5. `moveEntry`
 - **Description:** Move a file or folder.
 - **Params:** `{ "sourcePath": "...", "targetPath": "..." }`
 - **Returns:** `{ "sourcePath": "...", "targetPath": "..." }`
 
-### 6. `copyEntry`
+#### 6. `copyEntry`
 - **Description:** Copy a file or folder.
 - **Params:** `{ "sourcePath": "...", "targetPath": "..." }`
 - **Returns:** `{ "sourcePath": "...", "targetPath": "..." }`
 
-### 7. `readFileSegment`
+#### 7. `readFileSegment`
 - **Description:** Read a segment of a file (base64 encoded).
 - **Params:** `{ "path": "...", "offset": <int>, "length": <int> }`
 - **Returns:** `{ "data": "<base64 string>" }`
 
-### 8. `appendDataToFile`
+#### 8. `appendDataToFile`
 - **Description:** Append data to a file (base64 encoded).
 - **Params:** `{ "path": "...", "data": "<base64 string>" }`
 - **Returns:** `{ "path": "...", "appendLength": <int> }`
 
 ---
 
-## Error Codes
+### Error Codes
 
 | Code      | Name              | Description                                      | Example Scenario                        |
 |-----------|-------------------|--------------------------------------------------|-----------------------------------------|
@@ -218,7 +218,7 @@ For complete details about the JSON-RPC API, including endpoints, request and re
 
 ---
 
-## Notes
+### Notes
 
 - All file paths are relative to the configured root directory.
 - All data for file read/write is base64 encoded.
