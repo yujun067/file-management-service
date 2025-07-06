@@ -113,141 +113,193 @@ services:
 
 ---
 
-## API Usage (JSON-RPC 2.0)
-All requests are POSTed to `/filemanage` with a JSON-RPC 2.0 body. Example methods:
+## API Documentation
 
-### 1. getFileInfo
-Request:
+For complete details about the JSON-RPC API, including endpoints, request and response structures, available methods, and error codes, please refer to the [API.md](./API.md) file.
+
+---
+
+## Request Structure
+
 ```json
 {
   "jsonrpc": "2.0",
-  "method": "getFileInfo",
-  "params": { "path": "myfolder/file01.txt" },
-  "id": 1
-}
-```
-Response:
-```json
-{
-  "jsonrpc": "2.0",
-  "result": { "name": "myfile.txt", "path": "myfolder/file01.txt", "size": 13 },
-  "id": 1
+  "method": "<methodName>",
+  "params": { ... },
+  "id": "<client-generated-id>"
 }
 ```
 
-### 2. listDirectoryChildren
-Request:
+---
+
+## Response Structure
+
+**Success:**
 ```json
 {
   "jsonrpc": "2.0",
-  "method": "listDirectoryChildren",
-  "params": { "path": "myfolder" },
-  "id": 2
-}
-```
-Response:
-```json
-{
-  "jsonrpc": "2.0",
-  "result": [
-    { "path": "myfolder/file02.txt", "name": "file2.txt", "size": 10, "directory": false },
-    { "path": "myfolder/fold02", "name": "fold02", "size": 64, "directory": true }
-  ],
-  "id": 2
+  "result": { ... },
+  "id": "<same-as-request>"
 }
 ```
 
-### 3. createEntry
-Request (file):
+**Error:**
 ```json
 {
   "jsonrpc": "2.0",
-  "method": "createEntry",
-  "params": { "path": "myfolder/file03.txt", "type": "file" },
-  "id": 3
-}
-```
-Request (folder):
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "createEntry",
-  "params": { "path": "myfolder/folder03", "type": "folder" },
-  "id": 3
+  "error": {
+    "code": <int>,
+    "message": "<error description>"
+  },
+  "id": "<same-as-request>"
 }
 ```
 
-### 4. deleteEntry
-Request:
+---
+
+## Methods
+
+### 1. `getFileInfo`
+- **Description:** Get file or directory information.
+- **Params:** `{ "path": "<relative-path>" }`
+- **Returns:** `{ "name": "...", "path": "...", "size": <bytes> }`
+
+### 2. `listDirectoryChildren`
+- **Description:** List children of a directory.
+- **Params:** `{ "path": "<relative-path>" }`
+- **Returns:** `[{ "name": "...", "path": "...", "size": <bytes>, "directory": <bool> }, ...]`
+
+### 3. `createEntry`
+- **Description:** Create a file or folder.
+- **Params:** `{ "path": "<relative-path>", "type": "file" | "folder" }`
+- **Returns:** `{ "name": "...", "path": "...", "size": <bytes>, "directory": <bool> }`
+
+### 4. `deleteEntry`
+- **Description:** Delete a file or folder.
+- **Params:** `{ "path": "<relative-path>" }`
+- **Returns:** `{ "path": "..." }`
+
+### 5. `moveEntry`
+- **Description:** Move a file or folder.
+- **Params:** `{ "sourcePath": "...", "targetPath": "..." }`
+- **Returns:** `{ "sourcePath": "...", "targetPath": "..." }`
+
+### 6. `copyEntry`
+- **Description:** Copy a file or folder.
+- **Params:** `{ "sourcePath": "...", "targetPath": "..." }`
+- **Returns:** `{ "sourcePath": "...", "targetPath": "..." }`
+
+### 7. `readFileSegment`
+- **Description:** Read a segment of a file (base64 encoded).
+- **Params:** `{ "path": "...", "offset": <int>, "length": <int> }`
+- **Returns:** `{ "data": "<base64 string>" }`
+
+### 8. `appendDataToFile`
+- **Description:** Append data to a file (base64 encoded).
+- **Params:** `{ "path": "...", "data": "<base64 string>" }`
+- **Returns:** `{ "path": "...", "appendLength": <int> }`
+
+---
+
+## Error Codes
+
+| Code      | Name              | Description                                      | Example Scenario                        |
+|-----------|-------------------|--------------------------------------------------|-----------------------------------------|
+| -32601    | METHOD_NOT_FOUND  | Method not found                                 | Unknown method name                     |
+| -32602    | INVALID_PARAMS    | Invalid parameters                               | Path outside root, bad type, bad offset |
+| -32603    | INTERNAL_ERROR    | Internal server error                            | Unhandled exception                     |
+| -32000    | FILE_NOT_FOUND    | File or directory not found                      | Path does not exist                     |
+| -32001    | IO_ERROR          | IO Error (e.g., permission denied, disk error)   | File system operation fails             |
+
+**Error Response Example:**
 ```json
 {
   "jsonrpc": "2.0",
-  "method": "deleteEntry",
-  "params": { "path": "folder03" },
-  "id": 4
+  "error": {
+    "code": -32000,
+    "message": "File not found: nonexistent.txt"
+  },
+  "id": "case-1"
 }
 ```
 
-### 5. moveEntry
-Request:
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "moveEntry",
-  "params": { "sourcePath": "folder01/file1.txt", "targetPath": "folder02/file5.txt" },
-  "id": 5
-}
-```
+### Error Code Details
 
-### 6. copyEntry
-Request:
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "copyEntry",
-  "params": { "sourcePath": "folder01/file1.txt", "targetPath": "folder02/file5.txt" },
-  "id": 6
-}
-```
+- **-32601 (METHOD_NOT_FOUND):** The requested method does not exist or is not available.
+- **-32602 (INVALID_PARAMS):** The parameters are invalid (e.g., missing, wrong type, path outside root, invalid file type, etc.).
+- **-32603 (INTERNAL_ERROR):** An unexpected server error occurred.
+- **-32000 (FILE_NOT_FOUND):** The specified file or directory does not exist.
+- **-32001 (IO_ERROR):** An I/O error occurred (e.g., permission denied, disk full, etc.).
 
-### 7. readFileSegment
-Request:
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "readFileSegment",
-  "params": { "path": "folder07/file07.txt", "offset": 0, "length": 100 },
-  "id": 7
-}
-```
-- Response `data` is base64 encoded.
+---
 
-### 8. appendDataToFile
-Request:
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "appendDataToFile",
-  "params": { "path": "folder08/file08.txt", "data": "MTIz" },
-  "id": 8
-}
-```
-- Request `data` is base64 encoded.
+## Example Error Scenarios
+
+- **Path outside root:**  
+  Returns `-32602` with message containing "Outside root folder".
+- **File not found:**  
+  Returns `-32000` with message containing "File not found".
+- **Invalid type for createEntry:**  
+  Returns `-32602` with message containing "type must be 'file' or 'folder'".
+- **I/O error (e.g., permission denied):**  
+  Returns `-32001` with message containing the I/O error details.
+
+---
+
+## Notes
+
+- All file paths are relative to the configured root directory.
+- All data for file read/write is base64 encoded.
+- The `id` field in the response matches the request.
 
 ---
 
 ## Testing
-- Unit tests are in `src/test/java/com/jetbrains/filesystem/`
-- Run all tests:
-  ```sh
-  mvn clean test
-  ```
 
----
+Unit tests are located in `src/test/java/com/jetbrains/filesystem/`.
+
+To run all tests, use:
+
+```sh
+mvn clean test
+```
+
+or run all tests without maven installed.
+
+```sh
+./mvnw clean test
+```
 
 ## Deployment
-- **Docker:** See above for build/run instructions.
-- **Kubernetes:** A Helm chart is provided in the `helm/` directory for easy deployment.
 
----
+### Docker
 
+You can deploy the service as a Docker container:
+
+1. Build the Docker image:
+   ```sh
+   docker build -t file-management-service .
+   ```
+2. Run the container:
+   ```sh
+   docker run -p 8081:8081 file-management-service
+   ```
+   - Use `-v` to mount a custom config or data directory if needed.
+
+### Docker Compose
+
+A sample `docker-compose.yml` is provided. Start the service with:
+```sh
+docker-compose up --build
+```
+
+### Kubernetes (Helm)
+
+A Helm chart is provided in the `helm/` directory for Kubernetes deployment. To install using Helm:
+
+```sh
+cd helm
+helm install file-management-service .
+```
+
+You can customize values in the `values.yaml` file for your environment.
