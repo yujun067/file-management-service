@@ -77,10 +77,17 @@ You can override these at runtime using environment variables or by mounting a c
 
 ---
 
-## Building and Running
+## File Locking Strategy
 
-### With Docker
-1. **Build the image:**
+For details about the file locking and concurrency approach used in this project, please refer to [file_locking_strategy.md](./file_locking_strategy.md).
+
+---
+
+## Building and Deployment
+
+### Docker
+
+1. **Build the Docker image:**
    ```sh
    docker build -t file-management-service .
    ```
@@ -90,26 +97,24 @@ You can override these at runtime using environment variables or by mounting a c
    ```
    - Use `-v` to mount a custom config or data directory if needed.
 
-### With Docker Compose
-A sample `docker-compose.yml`:
-```yaml
-version: '3.8'
-services:
-  file-management-service:
-    build: .
-    container_name: file-management-service
-    ports:
-      - "8081:8081"
-    environment:
-      SPRING_PROFILE: "dev"
-      JAVA_OPTS: "-Xms512m -Xmx1024m"
-    volumes:
-      - ./data:/tmp/my-root
-      - ./config:/app/config
-    command: >
-      sh -c "java $JAVA_OPTS -jar app.jar --spring.config.location=classpath:/,file:/app/config/application-${SPRING_PROFILE}.yml"
+### Docker Compose
+
+A sample `docker-compose.yml` is provided. Start the service with:
+```sh
+docker-compose up --build
 ```
 - To override configuration, place your YAML in `./config` and set `SPRING_PROFILE` accordingly.
+
+### Kubernetes (Helm)
+
+A Helm chart is provided in the `helm/` directory for Kubernetes deployment. To install using Helm:
+
+```sh
+cd helm
+helm install file-management-service .
+```
+
+You can customize values in the `values.yaml` file for your environment.
 
 ---
 
@@ -269,37 +274,3 @@ or run all tests without maven installed.
 ```sh
 ./mvnw clean test
 ```
-
-## Deployment
-
-### Docker
-
-You can deploy the service as a Docker container:
-
-1. Build the Docker image:
-   ```sh
-   docker build -t file-management-service .
-   ```
-2. Run the container:
-   ```sh
-   docker run -p 8081:8081 file-management-service
-   ```
-   - Use `-v` to mount a custom config or data directory if needed.
-
-### Docker Compose
-
-A sample `docker-compose.yml` is provided. Start the service with:
-```sh
-docker-compose up --build
-```
-
-### Kubernetes (Helm)
-
-A Helm chart is provided in the `helm/` directory for Kubernetes deployment. To install using Helm:
-
-```sh
-cd helm
-helm install file-management-service .
-```
-
-You can customize values in the `values.yaml` file for your environment.
