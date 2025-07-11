@@ -1,6 +1,5 @@
 package com.jetbrains.filesystem.storage;
 
-import com.jetbrains.filesystem.FilesystemApplication;
 import com.jetbrains.filesystem.dto.file.FileInfo;
 import com.jetbrains.filesystem.exception.*;
 import com.jetbrains.filesystem.dto.file.EntryType;
@@ -53,8 +52,7 @@ public class LocalFileStorage implements FileStorage {
                 Files.createDirectories(p);
             }
         } catch (FileAlreadyExistsException e) {
-            throw new ConflictException("" +
-                    "already exists: " + p);
+            throw new ConflictException("already exists: " + p);
         } catch (IOException e) {
             throw new FileServiceException("File create failed", e) {};
         }
@@ -103,8 +101,7 @@ public class LocalFileStorage implements FileStorage {
         validateReadRequest(sourceFile, offset, length);
 
         try {
-            ByteBuffer buffer = FileUtil.readFileToBuffer(source, offset, length, MMAP_THRESHOLD);
-            return buffer;
+            return FileUtil.readFileToBuffer(source, offset, length, MMAP_THRESHOLD);
         } catch (IOException e) {
             throw new FileOperationException("Failed to read file", e);
         }
