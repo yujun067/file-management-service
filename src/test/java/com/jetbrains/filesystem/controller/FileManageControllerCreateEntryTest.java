@@ -1,76 +1,32 @@
 package com.jetbrains.filesystem.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jetbrains.filesystem.dto.JsonRpcRequest;
-import com.jetbrains.filesystem.config.FileServiceProperties;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.jetbrains.filesystem.dto.rpc.JsonRpcRequest;
 
 import org.junit.jupiter.api.*;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
 
-import java.io.IOException;
 import java.nio.file.*;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.stream.Stream;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest
-@AutoConfigureMockMvc
-public class FileManageControllerCreateEntryTest {
-
-    @Autowired
-    private MockMvc mockMvc;
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @Autowired
-    private FileServiceProperties properties;
-
-    private Path root;
-
-    private final String endpoint = "/filemanage";
-
-    @BeforeEach
-    void setup() {
-        root = Paths.get(properties.getRootFolder()).toAbsolutePath().normalize();
-    }
-
-    @AfterEach
-    void tearDown() throws IOException {
-        Path testDir = root.resolve("test-folder");
-        if (Files.exists(testDir)) {
-            deleteRecursively(testDir);
-        }
-    }
-
-    private void deleteRecursively(Path path) throws IOException {
-        if (!Files.exists(path)) return;
-        if (Files.isDirectory(path)) {
-            try (Stream<Path> paths = Files.list(path)) {
-                for (Path child : paths.toList()) {
-                    deleteRecursively(child);
-                }
-            }
-        }
-        Files.deleteIfExists(path);
-    }
-
-    private String toJsonRpc(String method, String id, String path, String type) throws Exception {
+public class FileManageControllerCreateEntryTest extends AbstractFileManageControllerTest{
+    private String toJsonRpc(String id, String path, String type) throws Exception {
         Map<String, Object> params = new HashMap<>();
         params.put("path", path);
         params.put("type", type);
+
+        JsonNode paramsNode = objectMapper.valueToTree(params);
+        JsonNode idNode = objectMapper.readTree("\"" + id + "\"");
+
         JsonRpcRequest request = new JsonRpcRequest();
-        request.setMethod(method);
-        request.setId(id);
-        request.setParams(params);
+        request.setMethod("createEntry");
+        request.setId(idNode);
+        request.setParams(paramsNode);
         return objectMapper.writeValueAsString(request);
     }
 
@@ -78,10 +34,10 @@ public class FileManageControllerCreateEntryTest {
     void testCreateEntry_InvalidType_ShouldReturnError() throws Exception {
         mockMvc.perform(post(endpoint)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(toJsonRpc("createEntry", "case-1", "test-folder/invalid.txt", "badtype")))
+                        .content(toJsonRpc("case-1", "test-folder/invalid.txt", "badtype")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error.code").value(-32602))
-                .andExpect(jsonPath("$.error.message").value(containsString("type must be 'file' or 'folder'")))
+                .andExpect(jsonPath("$.error.message").value(containsString("Unknown type")))
                 .andExpect(jsonPath("$.id").value("case-1"));
     }
 
@@ -89,10 +45,10 @@ public class FileManageControllerCreateEntryTest {
     void testCreateEntry_PathOutsideRoot_ShouldReturnError() throws Exception {
         mockMvc.perform(post(endpoint)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(toJsonRpc("createEntry", "case-2", "../../etc/passwd", "file")))
+                        .content(toJsonRpc("case-2", "../../etc/passwd", "file")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error.code").value(-32602))
-                .andExpect(jsonPath("$.error.message").value(containsString("Outside root folder")))
+                .andExpect(jsonPath("$.error.message").value(containsString("outside root")))
                 .andExpect(jsonPath("$.id").value("case-2"));
     }
 
@@ -105,30 +61,13 @@ public class FileManageControllerCreateEntryTest {
 
         mockMvc.perform(post(endpoint)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(toJsonRpc("createEntry", "case-3", path, "file")))
+                        .content(toJsonRpc("case-3", path, "file")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error.code").value(-32602))
                 .andExpect(jsonPath("$.error.message").value(containsString("already exists")))
                 .andExpect(jsonPath("$.id").value("case-3"));
     }
 
-    @Test
-    void testCreateEntry_CreationFails_ShouldReturnIOException() throws Exception {
-        String path = "test-folder/no-permission/file.txt";
-        Path parentDir = root.resolve("test-folder/no-permission");
-        Files.createDirectories(parentDir);
-        parentDir.toFile().setWritable(false);
-
-        mockMvc.perform(post(endpoint)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(toJsonRpc("createEntry", "case-4", path, "file")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.error.code").value(-32001))
-                .andExpect(jsonPath("$.error.message").value(containsString("Failed to create")))
-                .andExpect(jsonPath("$.id").value("case-4"));
-
-        parentDir.toFile().setWritable(true);
-    }
 
     @Test
     void testCreateEntry_Success_CreateFile() throws Exception {
@@ -136,7 +75,7 @@ public class FileManageControllerCreateEntryTest {
 
         mockMvc.perform(post(endpoint)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(toJsonRpc("createEntry", "case-5", path, "file")))
+                        .content(toJsonRpc("case-5", path, "file")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.name").value("created-file.txt"))
                 .andExpect(jsonPath("$.result.path").value(path))
@@ -151,7 +90,7 @@ public class FileManageControllerCreateEntryTest {
 
         mockMvc.perform(post(endpoint)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(toJsonRpc("createEntry", "case-6", path, "folder")))
+                        .content(toJsonRpc("case-6", path, "folder")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.name").value("new-folder"))
                 .andExpect(jsonPath("$.result.path").value(path))

@@ -13,5 +13,4 @@ public class FilesystemApplication {
 		SpringApplication.run(FilesystemApplication.class, args);
 		logger.info("Application started with Log4j2!");
 	}
-
 }

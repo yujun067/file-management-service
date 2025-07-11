@@ -1,17 +1,14 @@
 package com.jetbrains.filesystem.handler;
 
-import com.jetbrains.filesystem.service.FileManageService;
+import com.jetbrains.filesystem.api.FileManager;
+import com.jetbrains.filesystem.dto.file.DeleteEntryParams;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.util.Map;
-
 @Component
-public class DeleteEntryHandler implements JsonRpcMethodHandler {
-    private final FileManageService fileService;
-
-    public DeleteEntryHandler(FileManageService fileService) {
-        this.fileService = fileService;
-    }
+@RequiredArgsConstructor
+public class DeleteEntryHandler implements JsonRpcMethodHandler<DeleteEntryParams> {
+    private final FileManager fileService;
 
     @Override
     public String method() {
@@ -19,8 +16,12 @@ public class DeleteEntryHandler implements JsonRpcMethodHandler {
     }
 
     @Override
-    public Object handle(Map<String, Object> params) throws Exception {
-        String path = (String) params.get("path");
-        return fileService.deleteEntry(path);
+    public Object handle(DeleteEntryParams p)  {
+        return fileService.deleteEntry(p.getPath());
+    }
+
+    @Override
+    public Class<DeleteEntryParams> paramType() {   // new helper
+        return DeleteEntryParams.class;
     }
 }

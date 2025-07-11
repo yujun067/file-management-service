@@ -1,17 +1,16 @@
 package com.jetbrains.filesystem.handler;
 
-import com.jetbrains.filesystem.service.FileManageService;
+import com.jetbrains.filesystem.api.FileManager;
+import com.jetbrains.filesystem.dto.file.AppendDataToFileParams;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Component;
 
-import java.util.Map;
-
 @Component
-public class AppendDataToFileHandler implements JsonRpcMethodHandler {
-    private final FileManageService fileService;
-
-    public AppendDataToFileHandler(FileManageService fileService) {
-        this.fileService = fileService;
-    }
+@RequiredArgsConstructor
+@Log4j2
+public class AppendDataToFileHandler implements JsonRpcMethodHandler<AppendDataToFileParams> {
+    private final FileManager fileService;
 
     @Override
     public String method() {
@@ -19,9 +18,13 @@ public class AppendDataToFileHandler implements JsonRpcMethodHandler {
     }
 
     @Override
-    public Object handle(Map<String, Object> params) throws Exception {
-        String path = (String) params.get("path");
-        String data = (String) params.get("data");
-        return fileService.appendDataToFile(path, data);
+    public Object handle(AppendDataToFileParams p)  {
+        log.debug("appendDataToFile:{}", p.toString());
+        return fileService.appendDataToFile(p.getPath(),p.getData());
+    }
+
+    @Override
+    public Class<AppendDataToFileParams> paramType() {   // new helper
+        return AppendDataToFileParams.class;
     }
 }

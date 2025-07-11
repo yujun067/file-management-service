@@ -3,15 +3,10 @@ version: "3.8"
 services:
   file-management-service:
     build: .
-    container_name: file-management-service
     ports:
       - "8081:8081"
     volumes:
       - ./data:/tmp/my-root
-      - ./config:/app/config
     environment:
-      SPRING_PROFILE: ${SPRING_PROFILE}
-      JAVA_OPTS: ${JAVA_OPTS}
-    command: >
-        sh -c "java $JAVA_OPTS -jar app.jar
-          --spring.config.location=classpath:/,file:/app/config/application-${SPRING_PROFILE}.yml"
+      - JAVA_OPTS
+    command: java $JAVA_OPTS -jar app.jar

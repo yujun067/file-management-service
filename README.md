@@ -1,66 +1,95 @@
 # File Management Service
 
 ## Overview
-This project implements an HTTP JSON-RPC 2.0 service in Java (Spring Boot), allowing clients to perform file system operations within a configurable root directory. All file paths are treated as relative paths inside this root folder. The service exposes operations such as file info retrieval, directory listing, creation, deletion, moving/copying, data appending, and reading file contents.
+This project implements an HTTP JSON-RPC 2.0 file management service based on Java (Spring Boot), allowing clients to perform file system operations within a configurable root directory. All file paths are relative to this root directory. The service supports file info retrieval, directory listing, creation, deletion, moving/copying, data appending, and reading file contents.
 
 ---
 
 ## Features
-- Retrieve file information (name, path, size)
+- Retrieve file/directory information (name, path, size, type)
 - List children of a folder
 - Create an empty file or folder
 - Delete a file or folder
 - Move or copy a file/folder
-- Append data to a file (with concurrent writes isolation)
-- Read N bytes from a file at a specific offset
+- Append data to a file (concurrent write isolation)
+- Read file content by offset
 - Thread-safe concurrent writes
 - HTTP JSON-RPC 2.0 API
-- Containerized (Docker)
-- Deployable via Helm chart to Kubernetes
-- Unit-tested (JUnit)
+- Docker containerization support
+- Helm Chart deployment to Kubernetes
+- Unit testing (JUnit)
 
 ---
 
 ## Technology Stack
-| Layer           | Technology                                      |
-|-----------------|-------------------------------------------------|
-| Language        | Java 17                                         |
-| Framework       | Spring Boot                                     |
-| API Protocol    | JSON-RPC 2.0 (Jackson + custom controller)      |
-| Build Tool      | Maven                                           |
-| Testing         | JUnit 5, Mockito                                |
-| Concurrency     | Java `synchronized`, `ReentrantLock`, FileLocks |
-| Logging         | log4j2                                          |
-| Containerization| Docker                                          |
-| Deployment      | Helm Chart for Kubernetes                       |
+| Layer         | Technology                                      |
+|--------------|-------------------------------------------------|
+| Language     | Java 17                                         |
+| Framework    | Spring Boot                                     |
+| API Protocol | JSON-RPC 2.0 (Jackson + custom controller)      |
+| Build Tool   | Maven                                           |
+| Testing      | JUnit 5, Mockito                                |
+| Concurrency  | Java `ReentrantLock` |
+| Logging      | log4j2                                          |
+| Container    | Docker                                          |
+| Deployment   | Helm Chart for Kubernetes                       |
 
 ---
 
 ## Project Structure
+
 ```
-main/
-  java/com/jetbrains/filesystem/
-    controller/   # JSON-RPC controller
-    service/      # File management logic
-    dto/          # Data transfer objects
-    config/       # Configuration classes
-  resources/
-    application.yaml  # Main config
-    application-dev.yaml
-    application-prod.yaml
+file-management-service/
+├── API.md                  # API documentation
+├── README.md
+├── docker-compose.yml
+├── Dockerfile
+├── file_locking_strategy.md
+├── data/                   # Default data mount directory
+├── config/                 # Optional custom config mount directory
+├── file-management-service/ # Helm Chart directory
+│   ├── Chart.yaml
+│   ├── values.yaml
+│   └── templates/
+├── src/
+│   ├── main/
+│   │   ├── java/com/jetbrains/filesystem/
+│   │   │   ├── api/         # FileManager interface
+│   │   │   ├── config/      # Configuration classes
+│   │   │   ├── controller/  # JSON-RPC controller
+│   │   │   ├── dto/         # Data transfer objects
+│   │   │   │   ├── file/
+│   │   │   │   └── rpc/
+│   │   │   ├── exception/   # Exception definitions
+│   │   │   ├── handler/     # JSON-RPC method handlers
+│   │   │   ├── lock/        # File lock implementations
+│   │   │   ├── registry/    # Handler registry
+│   │   │   ├── service/     # File management logic
+│   │   │   ├── storage/     # File storage implementations
+│   │   │   └── util/        # Utility classes
+│   │   └── resources/
+│   │       ├── application.yaml
+│   │       └── log4j2.xml
+│   └── test/
+│       └── java/com/jetbrains/filesystem/
+│           ├── controller/
+│           ├── handler/
+│           ├── manager/
+│           └── util/
+├── mvnw
+├── mvnw.cmd
+└── pom.xml
 ```
 
 ---
 
 ## Configuration
-Configuration is managed via `src/main/resources/application.yaml` (and profile-specific YAMLs). Example:
+Configuration files are located in `src/main/resources/application.yaml` and its profile versions. Example:
 
 ```yaml
 spring:
   application:
     name: filesystem
-  profiles:
-    active: dev
 
 fileservice:
   rootFolder: /tmp/my-root
@@ -69,17 +98,14 @@ server:
   port: 8081
 ```
 
-- `fileservice.rootFolder`: The root directory for all file operations (default: `/tmp/my-root`).
-- `server.port`: The port the service listens on (default: `8081`).
-- Profiles: Use `dev` or `prod` for different environments.
-
-You can override these at runtime using environment variables or by mounting a custom YAML file (see Docker Compose section).
+- `fileservice.rootFolder`: The root directory for all file operations (default `/tmp/my-root`).
+- `server.port`: The port the service listens on (default `8081`).
 
 ---
 
 ## File Locking Strategy
 
-For details about the file locking and concurrency approach used in this project, please refer to [file_locking_strategy.md](./file_locking_strategy.md).
+For details about file locking and concurrency control, see [file_locking_strategy.md](./file_locking_strategy.md).
 
 ---
 
@@ -87,142 +113,37 @@ For details about the file locking and concurrency approach used in this project
 
 ### Docker
 
-1. **Build the Docker image:**
+1. **Build the image:**
    ```sh
    docker build -t file-management-service .
    ```
 2. **Run the container:**
    ```sh
-   docker run -p 8081:8081 file-management-service
+   docker run -p 8081:8081 -d file-management-service
    ```
-   - Use `-v` to mount a custom config or data directory if needed.
 
 ### Docker Compose
 
-A sample `docker-compose.yml` is provided. Start the service with:
+A sample `docker-compose.yml` is provided. Start the service:
 ```sh
-docker-compose up --build
+docker-compose up -d --build
 ```
-- To override configuration, place your YAML in `./config` and set `SPRING_PROFILE` accordingly.
 
 ### Kubernetes (Helm)
 
-A Helm chart is provided in the `helm/` directory for Kubernetes deployment. To install using Helm:
+The Helm chart is located in the `file-management-service/` directory. To install:
 
 ```sh
-cd helm
-helm install file-management-service .
+helm install file-service ./helm
 ```
 
-You can customize values in the `values.yaml` file for your environment.
+You can customize parameters in `values.yaml` for your environment.
 
 ---
 
 ## API Documentation
 
-For complete details about the JSON-RPC API, including endpoints, request and response structures, available methods, and error codes, please refer to the [API.md](./API.md) file.
-
----
-
-### Request Structure
-
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "<methodName>",
-  "params": { ... },
-  "id": "<client-generated-id>"
-}
-```
-
----
-
-### Response Structure
-
-**Success:**
-```json
-{
-  "jsonrpc": "2.0",
-  "result": { ... },
-  "id": "<same-as-request>"
-}
-```
-
-**Error:**
-```json
-{
-  "jsonrpc": "2.0",
-  "error": {
-    "code": <int>,
-    "message": "<error description>"
-  },
-  "id": "<same-as-request>"
-}
-```
-
----
-
-### Methods
-
-#### 1. `getFileInfo`
-- **Description:** Get file or directory information.
-- **Params:** `{ "path": "<relative-path>" }`
-- **Returns:** `{ "name": "...", "path": "...", "size": <bytes> }`
-
-#### 2. `listDirectoryChildren`
-- **Description:** List children of a directory.
-- **Params:** `{ "path": "<relative-path>" }`
-- **Returns:** `[{ "name": "...", "path": "...", "size": <bytes>, "directory": <bool> }, ...]`
-
-#### 3. `createEntry`
-- **Description:** Create a file or folder.
-- **Params:** `{ "path": "<relative-path>", "type": "file" | "folder" }`
-- **Returns:** `{ "name": "...", "path": "...", "size": <bytes>, "directory": <bool> }`
-
-#### 4. `deleteEntry`
-- **Description:** Delete a file or folder.
-- **Params:** `{ "path": "<relative-path>" }`
-- **Returns:** `{ "path": "..." }`
-
-#### 5. `moveEntry`
-- **Description:** Move a file or folder.
-- **Params:** `{ "sourcePath": "...", "targetPath": "..." }`
-- **Returns:** `{ "sourcePath": "...", "targetPath": "..." }`
-
-#### 6. `copyEntry`
-- **Description:** Copy a file or folder.
-- **Params:** `{ "sourcePath": "...", "targetPath": "..." }`
-- **Returns:** `{ "sourcePath": "...", "targetPath": "..." }`
-
-#### 7. `readFileSegment`
-- **Description:** Read a segment of a file (base64 encoded).
-- **Params:** `{ "path": "...", "offset": <int>, "length": <int> }`
-- **Returns:** `{ "data": "<base64 string>" }`
-
-#### 8. `appendDataToFile`
-- **Description:** Append data to a file (base64 encoded).
-- **Params:** `{ "path": "...", "data": "<base64 string>" }`
-- **Returns:** `{ "path": "...", "appendLength": <int> }`
-
----
-
-### Error Codes
-
-| Code      | Name              | Description                                      | Example Scenario                        |
-|-----------|-------------------|--------------------------------------------------|-----------------------------------------|
-| -32601    | METHOD_NOT_FOUND  | Method not found                                 | Unknown method name                     |
-| -32602    | INVALID_PARAMS    | Invalid parameters                               | Path outside root, bad type, bad offset |
-| -32603    | INTERNAL_ERROR    | Internal server error                            | Unhandled exception                     |
-| -32000    | FILE_NOT_FOUND    | File or directory not found                      | Path does not exist                     |
-| -32001    | IO_ERROR          | IO Error (e.g., permission denied, disk error)   | File system operation fails             |
-
----
-
-### Notes
-
-- All file paths are relative to the configured root directory.
-- All data for file read/write is base64 encoded.
-- The `id` field in the response matches the request.
+For complete JSON-RPC API details (including endpoints, request/response structures, methods, error codes, etc.), see [API.md](./API.md).
 
 ---
 
@@ -230,13 +151,13 @@ For complete details about the JSON-RPC API, including endpoints, request and re
 
 Unit tests are located in `src/test/java/com/jetbrains/filesystem/`.
 
-To run all tests, use:
+To run all tests:
 
 ```sh
 mvn clean test
 ```
 
-or run all tests without maven installed.
+Or without a local Maven installation:
 
 ```sh
 ./mvnw clean test

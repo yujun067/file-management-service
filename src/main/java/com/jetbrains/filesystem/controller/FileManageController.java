@@ -1,66 +1,82 @@
 package com.jetbrains.filesystem.controller;
 
-import com.jetbrains.filesystem.dto.*;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jetbrains.filesystem.exception.*;
+import com.jetbrains.filesystem.dto.rpc.JsonRpcRequest;
+import com.jetbrains.filesystem.dto.rpc.JsonRpcResponse;
 import com.jetbrains.filesystem.registry.JsonRpcHandlerRegistry;
 import com.jetbrains.filesystem.handler.JsonRpcMethodHandler;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import com.jetbrains.filesystem.util.JsonRpcErrorBuilder;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
+
 import org.springframework.web.bind.annotation.*;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 @RestController
-@RequestMapping("/filemanage")
+@RequestMapping("/api/v1/files")
+@RequiredArgsConstructor
+@Log4j2
 public class FileManageController {
-    private static final Logger logger = LogManager.getLogger(FileManageController.class);
-
     private final JsonRpcHandlerRegistry handlerRegistry;
+    private final ObjectMapper objectMapper;
 
-    public FileManageController(JsonRpcHandlerRegistry handlerRegistry) {
-        this.handlerRegistry = handlerRegistry;
-    }
+    @PostMapping()
+    public Object handle(@RequestBody JsonNode payload, HttpServletRequest request) {
+        if (payload.isArray()) {
+            log.debug("batch request: {}", payload);
+            List<JsonRpcResponse> responses = new ArrayList<>();
 
-    @PostMapping
-    public JsonRpcResponse handle(@RequestBody JsonRpcRequest request) {
-        logger.info("Received JSON-RPC request: method={}, id={}", request.getMethod(), request.getId());
-
-        try {
-            JsonRpcMethodHandler handler = handlerRegistry.getHandler(request.getMethod());
-            if (handler == null) {
-                return buildErrorResponse(request.getId(), JsonRpcErrorCode.METHOD_NOT_FOUND, request.getMethod());
+            for (JsonNode node : payload) {
+                JsonRpcRequest singleRequest = null;
+                try {
+                    singleRequest = objectMapper.convertValue(node, JsonRpcRequest.class);
+                    request.setAttribute("jsonrpc-id", singleRequest.getId());
+                    JsonRpcResponse response = processSingle(singleRequest);
+                    responses.add(response);
+                } catch (FileServiceException fsEx) {
+                    JsonRpcResponse errorResponse = JsonRpcErrorBuilder.fromFileServiceException(fsEx, request.getAttribute("jsonrpc-id"));
+                    responses.add(errorResponse);
+                    break; // stop processing remaining batch items
+                } catch (Exception ex) {
+                    JsonRpcResponse errorResponse = JsonRpcErrorBuilder.fromUnknownException(ex, request.getAttribute("jsonrpc-id"));
+                    responses.add(errorResponse);
+                    break; // stop processing remaining batch items
+                }
             }
 
-            Map<String, Object> params = castParams(request.getParams());
-            Object result = handler.handle(params);
-            return new JsonRpcResponse(result, request.getId());
-        } catch (FileNotFoundException e) {
-            return buildErrorResponse(request.getId(), JsonRpcErrorCode.FILE_NOT_FOUND, e.getMessage());
-        } catch (IOException e) {
-            return buildErrorResponse(request.getId(), JsonRpcErrorCode.IO_ERROR, e.getMessage());
-        } catch (IllegalArgumentException e) {
-            return buildErrorResponse(request.getId(), JsonRpcErrorCode.INVALID_PARAMS, e.getMessage());
-        } catch (Exception e) {
-            return buildErrorResponse(request.getId(), JsonRpcErrorCode.INTERNAL_ERROR, e.getMessage());
+            return responses;
+        } else {
+            log.debug("single request: {}", payload);
+            JsonRpcRequest singleRequest = null;
+            try {
+                singleRequest = objectMapper.convertValue(payload, JsonRpcRequest.class);
+                request.setAttribute("jsonrpc-id", singleRequest.getId());
+                return processSingle(singleRequest);
+            } catch (FileServiceException fsEx) {
+                return JsonRpcErrorBuilder.fromFileServiceException(fsEx, request.getAttribute("jsonrpc-id"));
+            } catch (Exception ex) {
+                return JsonRpcErrorBuilder.fromUnknownException(ex, request.getAttribute("jsonrpc-id"));
+            }
         }
     }
 
-    private Map<String, Object> castParams(Object rawParams) {
-        if (rawParams instanceof Map<?, ?>) {
-            return (Map<String, Object>) rawParams;
+    private JsonRpcResponse processSingle(JsonRpcRequest request) {
+        log.debug("Received JSON-RPC request: method={}, id={}, params={}", request.getMethod(), request.getId(), request.getParams());
+
+        JsonRpcMethodHandler handler = handlerRegistry.getHandler(request.getMethod());
+        if (handler == null) {
+            throw new MethodNotFoundException("method not found:" + request.getMethod());
         }
-        throw new IllegalArgumentException("Parameters must be a JSON object");
+
+        Object typedParams = objectMapper.convertValue(request.getParams(), handler.paramType());
+        Object result = handler.handle(typedParams);
+        return new JsonRpcResponse(result, request.getId());
     }
 
-    private JsonRpcResponse buildErrorResponse(Object id, JsonRpcErrorCode code, String details) {
-        String message = code.getDefaultMessage() + (details != null ? ": " + details : "");
-        logger.warn("Error ({}): {}", code.getCode(), message);
-        Map<String, Object> error = Map.of(
-                "code", code.getCode(),
-                "message", message
-        );
-        return new JsonRpcResponse(error, id, true);
-    }
 }

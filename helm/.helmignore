@@ -1,0 +1,49 @@
+# Ignore Helm build artifacts
+*.tgz
+.chart-release/
+.releaserc
+
+# Ignore OS metadata
+.DS_Store
+Thumbs.db
+
+# Ignore VCS
+.git/
+.gitignore
+.hg/
+.svn/
+
+# IDE/project settings
+.idea/
+.vscode/
+*.iml
+*.log
+
+# Java build output
+target/
+build/
+*.class
+
+# Temporary/editor files
+*.swp
+*.bak
+*.tmp
+*.old
+
+# Documentation & local config
+README.md
+LICENSE
+.env
+.env.*
+docker-compose.yml
+values-dev.yaml
+values-test.yaml
+values-prod.yaml
+
+# Ignore Docker build artifacts
+.dockerignore
+Dockerfile
+
+# Optional: test files if not part of deployment
+test/
+tests/

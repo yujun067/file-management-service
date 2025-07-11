@@ -1,18 +1,16 @@
 package com.jetbrains.filesystem.handler;
 
-import com.jetbrains.filesystem.service.FileManageService;
+import com.jetbrains.filesystem.dto.file.GetFileInfoParams;
+import com.jetbrains.filesystem.service.LocalFileManager;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Component;
 
-import java.util.Map;
-import java.io.IOException;
-
 @Component
-public class GetFileInfoHandler implements JsonRpcMethodHandler {
-    private final FileManageService fileService;
-
-    public GetFileInfoHandler(FileManageService fileService) {
-        this.fileService = fileService;
-    }
+@RequiredArgsConstructor
+@Log4j2
+public class GetFileInfoHandler implements JsonRpcMethodHandler<GetFileInfoParams> {
+    private final LocalFileManager fileService;
 
     @Override
     public String method() {
@@ -20,8 +18,13 @@ public class GetFileInfoHandler implements JsonRpcMethodHandler {
     }
 
     @Override
-    public Object handle(Map<String, Object> params) throws Exception {
-        String path = (String) params.get("path");
-        return fileService.getFileInfo(path);
+    public Object handle(GetFileInfoParams p)  {
+        log.debug("getFileInfo:{}", p.toString());
+        return fileService.getFileInfo(p.getPath());
+    }
+
+    @Override
+    public Class<GetFileInfoParams> paramType() {
+        return GetFileInfoParams.class;
     }
 }

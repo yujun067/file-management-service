@@ -1,0 +1,34 @@
+# Java build outputs
+target/
+build/
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+
+# VCS
+.git/
+.gitignore
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Docker
+.dockerignore
+Dockerfile
+
+# Logs and temp files
+*.log
+*.tmp
+*.bak
+*.swp
+
+# Helm (if also included in project)
+helm/
+*.tgz
+
+# Local config files
+.env
+.env.*

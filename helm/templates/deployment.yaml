@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "file-management-service.fullname" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "file-management-service.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "file-management-service.name" . }}
+    spec:
+      containers:
+        - name: file-service
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 8081
+          env:
+            - name: SPRING_PROFILE
+              value: {{ .Values.env.springProfile }}
+            - name: JAVA_OPTS
+              value: {{ .Values.env.javaOpts }}
+          command:
+            - sh
+            - -c
+            - java $JAVA_OPTS -jar app.jar
+          volumeMounts:
+            - name: data
+              mountPath: {{ .Values.persistence.mountPath }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "file-management-service.fullname" . }}-pvc

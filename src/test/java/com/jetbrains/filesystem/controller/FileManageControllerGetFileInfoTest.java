@@ -1,78 +1,30 @@
 package com.jetbrains.filesystem.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jetbrains.filesystem.config.FileServiceProperties;
-import com.jetbrains.filesystem.dto.JsonRpcRequest;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.jetbrains.filesystem.dto.rpc.JsonRpcRequest;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.stream.Stream;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest
-@AutoConfigureMockMvc
-public class FileManageControllerGetFileInfoTest {
-
-    @Autowired
-    private MockMvc mockMvc;
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @Autowired
-    private FileServiceProperties fileServiceProperties;
-
-    private String endpoint = "/filemanage";
-
-    private Path root;
-
-
-    @BeforeEach
-    void setup() {
-        root = Paths.get(fileServiceProperties.getRootFolder()).toAbsolutePath().normalize();
-    }
-
-    @AfterEach
-    void tearDown() throws IOException {
-        Path testDir = root.resolve("test-folder");
-        if (Files.exists(testDir)) {
-            deleteRecursively(testDir);
-        }
-    }
-
-    private void deleteRecursively(Path path) throws IOException {
-        if (!Files.exists(path)) return;
-        if (Files.isDirectory(path)) {
-            try (Stream<Path> paths = Files.list(path)) {
-                for (Path child : paths.toList()) {
-                    deleteRecursively(child);
-                }
-            }
-        }
-        Files.deleteIfExists(path);
-    }
-
+public class FileManageControllerGetFileInfoTest extends AbstractFileManageControllerTest {
     private String toJsonRpc(String path, String id) throws Exception {
         Map<String, Object> params = new HashMap<>();
         params.put("path", path);
+
+        JsonNode paramsNode = objectMapper.valueToTree(params);
+        JsonNode idNode = objectMapper.readTree("\"" + id + "\"");
+
         JsonRpcRequest request = new JsonRpcRequest();
         request.setMethod("getFileInfo");
-        request.setId(id);
-        request.setParams(params);
+        request.setId(idNode);
+        request.setParams(paramsNode);
         return objectMapper.writeValueAsString(request);
     }
 
@@ -114,7 +66,7 @@ public class FileManageControllerGetFileInfoTest {
                         .content(toJsonRpc("../malicious.txt", "case-2")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error.code").value(-32602))
-                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("Outside root folder")))
+                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("outside root")))
                 .andExpect(jsonPath("$.id").value("case-2"));
     }
 
@@ -125,7 +77,7 @@ public class FileManageControllerGetFileInfoTest {
                         .content(toJsonRpc(null, "case-3")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error.code").value(-32602))
-                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("Invalid path")))
+                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("Invalid params")))
                 .andExpect(jsonPath("$.id").value("case-3"));
     }
 
@@ -136,7 +88,7 @@ public class FileManageControllerGetFileInfoTest {
                         .content(toJsonRpc("", "case-4")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error.code").value(-32602))
-                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("Invalid path")))
+                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("Invalid params")))
                 .andExpect(jsonPath("$.id").value("case-4"));
     }
 }

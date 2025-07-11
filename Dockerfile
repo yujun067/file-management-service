@@ -11,10 +11,10 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 
-COPY --from=build /app/target/*.jar app.jar
+COPY --from=build /app/target/filesystem-0.0.1-SNAPSHOT.jar app.jar
 
 RUN mkdir -p /tmp/my-root
 
 EXPOSE 8081
 ENV JAVA_OPTS="-Xms512m -Xmx1024m"
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar --spring.config.location=classpath:/,file:/app/config/ --spring.profiles.active=$SPRING_PROFILE"]
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

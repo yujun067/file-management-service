@@ -1,74 +1,32 @@
 package com.jetbrains.filesystem.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jetbrains.filesystem.dto.JsonRpcRequest;
-import com.jetbrains.filesystem.config.FileServiceProperties;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.jetbrains.filesystem.dto.rpc.JsonRpcRequest;
 
 import org.junit.jupiter.api.*;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
 
-import java.io.IOException;
 import java.nio.file.*;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.stream.Stream;
 
+import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest
-@AutoConfigureMockMvc
-public class FileManageControllerListDirectoryChildrenTest {
-
-    @Autowired
-    private MockMvc mockMvc;
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @Autowired
-    private FileServiceProperties properties;
-
-    private Path root;
-
-    private final String endpoint = "/filemanage";
-
-    @BeforeEach
-    void setup() {
-        root = Paths.get(properties.getRootFolder()).toAbsolutePath().normalize();
-    }
-
-    @AfterEach
-    void tearDown() throws IOException {
-        Path testDir = root.resolve("test-folder");
-        if (Files.exists(testDir)) {
-            deleteRecursively(testDir);
-        }
-    }
-
-    private void deleteRecursively(Path path) throws IOException {
-        if (!Files.exists(path)) return;
-        if (Files.isDirectory(path)) {
-            try (Stream<Path> paths = Files.list(path)) {
-                for (Path child : paths.toList()) {
-                    deleteRecursively(child);
-                }
-            }
-        }
-        Files.deleteIfExists(path);
-    }
-
-    private String toJsonRpc(String method, String id, String path) throws Exception {
+public class FileManageControllerListDirectoryChildrenTest extends AbstractFileManageControllerTest {
+    private String toJsonRpc(String id, String path) throws Exception {
         Map<String, Object> params = new HashMap<>();
         params.put("path", path);
+
+        JsonNode paramsNode = objectMapper.valueToTree(params);
+        JsonNode idNode = objectMapper.readTree("\"" + id + "\"");
+
         JsonRpcRequest request = new JsonRpcRequest();
-        request.setMethod(method);
-        request.setId(id);
-        request.setParams(params);
+        request.setMethod("listDirectoryChildren");
+        request.setId(idNode);
+        request.setParams(paramsNode);
         return objectMapper.writeValueAsString(request);
     }
 
@@ -86,26 +44,30 @@ public class FileManageControllerListDirectoryChildrenTest {
 
         mockMvc.perform(post(endpoint)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(toJsonRpc("listDirectoryChildren", "case-0", testDir)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result").isArray())
-                .andExpect(jsonPath("$.result.length()").value(3)) // file1, file2, subdir
-                .andExpect(jsonPath("$.result[?(@.name=='file1.txt')]").exists())
-                .andExpect(jsonPath("$.result[?(@.name=='file2.txt')]").exists())
-                .andExpect(jsonPath("$.result[?(@.name=='subdir')]").exists())
-                .andExpect(jsonPath("$.id").value("case-0"))
-                .andExpect(jsonPath("$.error").doesNotExist());
+                        .content(toJsonRpc("case-0", testDir)))
+                .andExpectAll(
+                        status().isOk(),
+                        jsonPath("$.jsonrpc").value("2.0"),
+                        jsonPath("$.id").value("case-0"),
+                        jsonPath("$.error").doesNotExist(),
+
+                        // 3 elements
+                        jsonPath("$.result.fileInfos", hasSize(3)),
+                        jsonPath("$.result.fileInfos[*].name",
+                                containsInAnyOrder("file1.txt", "file2.txt", "subdir"))
+                );
     }
 
     @Test
     void testListDirectoryChildren_PathOutsideRoot_ShouldReturnError() throws Exception {
         mockMvc.perform(post(endpoint)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(toJsonRpc("listDirectoryChildren", "case-1", "../../etc")))
+                        .content(toJsonRpc("case-1", "../../etc")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error.code").value(-32602))
-                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("Outside root folder")))
+                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("outside root")))
                 .andExpect(jsonPath("$.id").value("case-1"));
+
     }
 
     @Test
@@ -117,10 +79,10 @@ public class FileManageControllerListDirectoryChildrenTest {
 
         mockMvc.perform(post(endpoint)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(toJsonRpc("listDirectoryChildren", "case-2", filePath)))
+                        .content(toJsonRpc("case-2", filePath)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.error.code").value(-32602))
-                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("not a directory")))
+                .andExpect(jsonPath("$.error.code").value(-32000))
+                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("File not found")))
                 .andExpect(jsonPath("$.id").value("case-2"));
     }
 
@@ -128,10 +90,10 @@ public class FileManageControllerListDirectoryChildrenTest {
     void testListDirectoryChildren_NonExistentPath_ShouldReturnError() throws Exception {
         mockMvc.perform(post(endpoint)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(toJsonRpc("listDirectoryChildren", "case-3", "nonexistent-folder")))
+                        .content(toJsonRpc("case-3", "nonexistent-folder")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.error.code").value(-32602))
-                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("not a directory")))
+                .andExpect(jsonPath("$.error.code").value(-32000))
+                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("File not found")))
                 .andExpect(jsonPath("$.id").value("case-3"));
     }
 
@@ -139,17 +101,19 @@ public class FileManageControllerListDirectoryChildrenTest {
     void testListDirectoryChildren_NullPath_ShouldReturnError() throws Exception {
         JsonRpcRequest request = new JsonRpcRequest();
         request.setMethod("listDirectoryChildren");
-        request.setId("case-4");
+        JsonNode idNode = objectMapper.readTree("\"case-4\"");
+        request.setId(idNode);
         Map<String, Object> params = new HashMap<>();
         params.put("path", null);
-        request.setParams(params);
+        JsonNode paramsNode = objectMapper.valueToTree(params);
+        request.setParams(paramsNode);
 
         mockMvc.perform(post(endpoint)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error.code").value(-32602))
-                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("Invalid path")))
+                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("Invalid params")))
                 .andExpect(jsonPath("$.id").value("case-4"));
     }
 
@@ -157,10 +121,10 @@ public class FileManageControllerListDirectoryChildrenTest {
     void testListDirectoryChildren_EmptyPath_ShouldReturnError() throws Exception {
         mockMvc.perform(post(endpoint)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(toJsonRpc("listDirectoryChildren", "case-5", "")))
+                        .content(toJsonRpc("case-5", "")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error.code").value(-32602))
-                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("Invalid path")))
+                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("Invalid params")))
                 .andExpect(jsonPath("$.id").value("case-5"));
     }
 }

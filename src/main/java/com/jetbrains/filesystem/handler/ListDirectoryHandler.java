@@ -1,17 +1,14 @@
 package com.jetbrains.filesystem.handler;
 
-import com.jetbrains.filesystem.service.FileManageService;
+import com.jetbrains.filesystem.dto.file.ListDirectoryParams;
+import com.jetbrains.filesystem.service.LocalFileManager;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.util.Map;
-
 @Component
-public class ListDirectoryHandler implements JsonRpcMethodHandler {
-    private final FileManageService fileService;
-
-    public ListDirectoryHandler(FileManageService fileService) {
-        this.fileService = fileService;
-    }
+@RequiredArgsConstructor
+public class ListDirectoryHandler implements JsonRpcMethodHandler<ListDirectoryParams> {
+    private final LocalFileManager fileService;
 
     @Override
     public String method() {
@@ -19,8 +16,12 @@ public class ListDirectoryHandler implements JsonRpcMethodHandler {
     }
 
     @Override
-    public Object handle(Map<String, Object> params) throws Exception {
-        String path = (String) params.get("path");
-        return fileService.listDirectoryChildren(path);
+    public Object handle(ListDirectoryParams p)  {
+        return fileService.listDirectoryChildren(p.getPath());
+    }
+
+    @Override
+    public Class<ListDirectoryParams> paramType() {   // new helper
+        return ListDirectoryParams.class;
     }
 }

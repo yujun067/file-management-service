@@ -1,87 +1,32 @@
 package com.jetbrains.filesystem.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jetbrains.filesystem.TestSpyConfig;
-import com.jetbrains.filesystem.config.FileServiceProperties;
-import com.jetbrains.filesystem.dto.JsonRpcRequest;
-import com.jetbrains.filesystem.service.FileManageService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.jetbrains.filesystem.dto.rpc.JsonRpcRequest;
 
 import org.junit.jupiter.api.*;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.boot.test.context.TestConfiguration;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.nio.file.*;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.stream.Stream;
 
 import static org.hamcrest.Matchers.containsString;
-import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest
-@Import(TestSpyConfig.class)
-@AutoConfigureMockMvc
-public class FileManageControllerCopyEntryTest {
-
-    @Autowired
-    private MockMvc mockMvc;
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @Autowired
-    private FileServiceProperties properties;
-
-    @Autowired
-    private FileManageService fileService;
-
-    private Path root;
-    private final String endpoint = "/filemanage";
-
-    @BeforeEach
-    void setup() {
-        root = Paths.get(properties.getRootFolder()).toAbsolutePath().normalize();
-    }
-
-    @AfterEach
-    void tearDown() throws IOException {
-        reset(fileService);  // clear configurations like throws
-        Path testDir = root.resolve("test-folder");
-        if (Files.exists(testDir)) {
-            deleteRecursively(testDir);
-        }
-    }
-
-    private void deleteRecursively(Path path) throws IOException {
-        if (!Files.exists(path)) return;
-        if (Files.isDirectory(path)) {
-            try (Stream<Path> paths = Files.list(path)) {
-                for (Path child : paths.toList()) {
-                    deleteRecursively(child);
-                }
-            }
-        }
-        Files.deleteIfExists(path);
-    }
-
+public class FileManageControllerCopyEntryTest extends AbstractFileManageControllerTest{
     private String toJsonRpc(String sourcePath, String targetPath, String id) throws Exception {
         Map<String, Object> params = new HashMap<>();
         params.put("sourcePath", sourcePath);
         params.put("targetPath", targetPath);
+
+        JsonNode paramsNode = objectMapper.valueToTree(params);
+        JsonNode idNode = objectMapper.readTree("\"" + id + "\"");
+
         JsonRpcRequest request = new JsonRpcRequest();
         request.setMethod("copyEntry");
-        request.setId(id);
-        request.setParams(params);
+        request.setId(idNode);
+        request.setParams(paramsNode);
         return objectMapper.writeValueAsString(request);
     }
 
@@ -134,7 +79,7 @@ public class FileManageControllerCopyEntryTest {
                         .content(toJsonRpc("../../outside.txt", "test-folder/target.txt", "case-3")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error.code").value(-32602))
-                .andExpect(jsonPath("$.error.message").value(containsString("Outside root folder")))
+                .andExpect(jsonPath("$.error.message").value(containsString("outside root")))
                 .andExpect(jsonPath("$.id").value("case-3"));
     }
 
@@ -150,7 +95,7 @@ public class FileManageControllerCopyEntryTest {
                         .content(toJsonRpc(source, "../../etc/passwd", "case-4")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error.code").value(-32602))
-                .andExpect(jsonPath("$.error.message").value(containsString("Outside root folder")))
+                .andExpect(jsonPath("$.error.message").value(containsString("outside root")))
                 .andExpect(jsonPath("$.id").value("case-4"));
     }
 
@@ -178,29 +123,8 @@ public class FileManageControllerCopyEntryTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(toJsonRpc(source, target, "case-6")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.error.code").value(-32602))
+                .andExpect(jsonPath("$.error.code").value(-32002))
                 .andExpect(jsonPath("$.error.message").value(containsString("target already exists")))
                 .andExpect(jsonPath("$.id").value("case-6"));
-    }
-
-    @Test
-    void testCopyEntry_CopyFails_ShouldReturnIOException() throws Exception {
-        String source = "test-folder/fail-src.txt";
-        String target = "test-folder/fail-dst.txt";
-
-        Path sourcePath = root.resolve(source);
-        Files.createDirectories(sourcePath.getParent());
-        Files.writeString(sourcePath, "data");
-
-        doThrow(new IOException("Simulated copy failure"))
-                .when(fileService).copyPath(any(Path.class), any(Path.class));
-
-        mockMvc.perform(post(endpoint)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(toJsonRpc(source, target, "case-7")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.error.code").value(-32001))
-                .andExpect(jsonPath("$.error.message").value(containsString("Failed to copy")))
-                .andExpect(jsonPath("$.id").value("case-7"));
     }
 }

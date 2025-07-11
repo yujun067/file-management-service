@@ -1,17 +1,14 @@
 package com.jetbrains.filesystem.handler;
 
-import com.jetbrains.filesystem.service.FileManageService;
+import com.jetbrains.filesystem.dto.file.ReadFileSegmentParams;
+import com.jetbrains.filesystem.service.LocalFileManager;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.util.Map;
-
 @Component
-public class ReadFileSegmentHandler implements JsonRpcMethodHandler {
-    private final FileManageService fileService;
-
-    public ReadFileSegmentHandler(FileManageService fileService) {
-        this.fileService = fileService;
-    }
+@RequiredArgsConstructor
+public class ReadFileSegmentHandler implements JsonRpcMethodHandler<ReadFileSegmentParams> {
+    private final LocalFileManager fileService;
 
     @Override
     public String method() {
@@ -19,10 +16,13 @@ public class ReadFileSegmentHandler implements JsonRpcMethodHandler {
     }
 
     @Override
-    public Object handle(Map<String, Object> params) throws Exception {
-        String path = (String) params.get("path");
-        Number offset = (Number) params.get("offset");
-        Number length = (Number) params.get("length");
-        return fileService.readFile(path, offset.longValue(), length.intValue());
+    public Object handle(ReadFileSegmentParams p) {
+        return fileService.readFile(p.getPath(), p.getOffset(), p.getLength());
     }
+
+    @Override
+    public Class<ReadFileSegmentParams> paramType() {
+        return ReadFileSegmentParams.class;
+    }
+
 }

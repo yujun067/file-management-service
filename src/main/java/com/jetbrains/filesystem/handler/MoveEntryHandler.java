@@ -1,17 +1,14 @@
 package com.jetbrains.filesystem.handler;
 
-import com.jetbrains.filesystem.service.FileManageService;
+import com.jetbrains.filesystem.dto.file.MoveEntryParams;
+import com.jetbrains.filesystem.service.LocalFileManager;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.util.Map;
-
 @Component
-public class MoveEntryHandler implements JsonRpcMethodHandler {
-    private final FileManageService fileService;
-
-    public MoveEntryHandler(FileManageService fileService) {
-        this.fileService = fileService;
-    }
+@RequiredArgsConstructor
+public class MoveEntryHandler implements JsonRpcMethodHandler<MoveEntryParams> {
+    private final LocalFileManager fileService;
 
     @Override
     public String method() {
@@ -19,9 +16,12 @@ public class MoveEntryHandler implements JsonRpcMethodHandler {
     }
 
     @Override
-    public Object handle(Map<String, Object> params) throws Exception {
-        String source = (String) params.get("sourcePath");
-        String target = (String) params.get("targetPath");
-        return fileService.moveEntry(source, target);
+    public Object handle(MoveEntryParams p) {
+        return fileService.moveEntry(p.getSourcePath(), p.getTargetPath());
+    }
+
+    @Override
+    public Class<MoveEntryParams> paramType() {   // new helper
+        return MoveEntryParams.class;
     }
 }
